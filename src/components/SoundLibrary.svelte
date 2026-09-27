@@ -118,7 +118,6 @@
 <input
   bind:this={fileInput}
   type="file"
-  accept="audio/*"
   multiple
   style="display:none"
   onchange={addFiles}
@@ -180,6 +179,10 @@
 <button class="btn primary block" onclick={() => fileInput?.click()} disabled={busy}>
   ＋ 음향 파일 추가
 </button>
+<div class="tiny muted">
+  파일 앱(iCloud Drive · On My iPhone)에서 mp3 · m4a · wav 파일을 고르세요. 선택 목록이 비어 있으면
+  파일 앱에서 그 파일을 한 번 열어 폰에 내려받은 뒤 다시 시도해 보세요. (ogg · flac 은 아이폰에서 재생되지 않습니다)
+</div>
 
 <div class="card stack">
   <div class="row-between">

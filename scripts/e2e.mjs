@@ -165,6 +165,52 @@ async function report() {
   process.exit(1)
 }
 
+/* ------------------------------ 도우미 함수 ------------------------------ */
+
+/** 브라우저 안에서 WAV 파일 객체를 만드는 도우미를 설치한다. */
+const installFileFactory = () =>
+  evaluate(`(() => {
+  window.__makeWavFile = (name, mime, seconds = 0.5, frequency = 440) => {
+    const sampleRate = 8000
+    const frames = Math.round(sampleRate * seconds)
+    const buffer = new ArrayBuffer(44 + frames * 2)
+    const view = new DataView(buffer)
+    const text = (offset, value) => {
+      for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i))
+    }
+    text(0, 'RIFF')
+    view.setUint32(4, 36 + frames * 2, true)
+    text(8, 'WAVE')
+    text(12, 'fmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, 1, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * 2, true)
+    view.setUint16(32, 2, true)
+    view.setUint16(34, 16, true)
+    text(36, 'data')
+    view.setUint32(40, frames * 2, true)
+    for (let i = 0; i < frames; i += 1) {
+      view.setInt16(44 + i * 2, Math.round(Math.sin((i / sampleRate) * 2 * Math.PI * frequency) * 12000), true)
+    }
+    return new File([buffer], name, mime ? { type: mime } : undefined)
+  }
+  return true
+})()`)
+
+/** 파일 입력에 파일을 넣고 change 이벤트를 발생시킨다. */
+const uploadFile = (fileExpression) =>
+  evaluate(`(() => {
+  const input = document.querySelector('input[type=file]')
+  if (!input) return 'NO_INPUT'
+  const transfer = new DataTransfer()
+  transfer.items.add(${fileExpression})
+  input.files = transfer.files
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+  return 'OK'
+})()`)
+
 /* --------------------------------- 테스트 --------------------------------- */
 
 await send('Runtime.enable')
@@ -198,6 +244,8 @@ const installSchedulerProbe = () =>
 })()`)
 
 await installSchedulerProbe()
+await installFileFactory()
+await sleep(300)
 
 // 새 프로젝트 생성 → 0:02 / 5:02 두 개의 시간
 await click('＋ 새 프로젝트')
@@ -348,39 +396,7 @@ check('샘플 소리 길이(0:30)가 표시된다', libraryText.includes('0:30')
 check('샘플 소리 라이선스(CC0)가 표시된다', libraryText.includes('CC0'))
 
 // 사용자 음향 파일 추가(IndexedDB 저장 + 디코딩 검증)
-const fileResult = await evaluate(`(() => {
-  const sampleRate = 8000
-  const frames = sampleRate / 2
-  const buffer = new ArrayBuffer(44 + frames * 2)
-  const view = new DataView(buffer)
-  const text = (offset, value) => {
-    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i))
-  }
-  text(0, 'RIFF')
-  view.setUint32(4, 36 + frames * 2, true)
-  text(8, 'WAVE')
-  text(12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, 1, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * 2, true)
-  view.setUint16(32, 2, true)
-  view.setUint16(34, 16, true)
-  text(36, 'data')
-  view.setUint32(40, frames * 2, true)
-  for (let i = 0; i < frames; i += 1) {
-    view.setInt16(44 + i * 2, Math.round(Math.sin((i / sampleRate) * 2 * Math.PI * 440) * 12000), true)
-  }
-  const file = new File([buffer], 'tone-test.wav', { type: 'audio/wav' })
-  const input = document.querySelector('input[type=file]')
-  if (!input) return 'NO_INPUT'
-  const transfer = new DataTransfer()
-  transfer.items.add(file)
-  input.files = transfer.files
-  input.dispatchEvent(new Event('change', { bubbles: true }))
-  return 'OK'
-})()`)
+const fileResult = await uploadFile(`window.__makeWavFile('tone-test.wav', 'audio/wav')`)
 check('음향 파일 입력이 존재한다', fileResult === 'OK', fileResult)
 
 await waitFor(async () => (await text()).includes('tone-test'), '내 소리에 파일 추가', 8000)
@@ -388,6 +404,31 @@ const afterUpload = await text()
 check('추가한 파일이 내 소리에 표시된다', afterUpload.includes('tone-test'))
 check('추가한 파일 길이가 표시된다(0.5초 → 0:01)', afterUpload.includes('0:01'))
 check('내 소리 개수가 늘어난다', afterUpload.includes('내 소리 1개'))
+
+// 확장자·MIME 이 오디오로 인식되지 않아도 실제로 디코딩되면 추가되어야 한다
+// (아이폰 파일 선택기에서 흐리게 보여 선택할 수 없던 파일을 고를 수 있게 하기 위한 처리)
+const weirdUpload = await uploadFile(`window.__makeWavFile('tone-unknown.dat', '')`)
+check('확장자가 달라도 파일을 선택할 수 있다', weirdUpload === 'OK', weirdUpload)
+await waitFor(async () => (await text()).includes('tone-unknown'), '확장자가 다른 파일 추가', 8000)
+check(
+  '오디오로 인식되지 않는 확장자도 내용이 소리면 추가된다',
+  (await text()).includes('tone-unknown'),
+)
+check('내 소리 개수가 2개가 된다', (await text()).includes('내 소리 2개'))
+
+// 소리가 아닌 파일은 명확한 안내와 함께 거부된다
+const textFileResult = await evaluate(`(() => {
+  const input = document.querySelector('input[type=file]')
+  if (!input) return 'NO_INPUT'
+  const transfer = new DataTransfer()
+  transfer.items.add(new File(['이 파일은 소리가 아닙니다'], 'not-audio.txt', { type: 'text/plain' }))
+  input.files = transfer.files
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+  return 'OK'
+})()`)
+check('소리가 아닌 파일도 선택 자체는 가능하다', textFileResult === 'OK', textFileResult)
+await waitFor(async () => (await text()).includes('소리 파일로 읽을 수 없습니다'), '거부 안내', 8000)
+check('소리가 아닌 파일은 안내와 함께 추가되지 않는다', (await text()).includes('내 소리 2개'))
 
 // 저장(IndexedDB) 확인
 await send('Page.reload')
@@ -466,7 +507,17 @@ await waitFor(async () => (await text()).includes('소리 보관함'), '소리 �
 await clickAria('삭제')
 await sleep(200)
 await clickAria('삭제')
-await waitFor(async () => (await text()).includes('내 소리 0개'), '소리 삭제', 8000)
+await sleep(300)
+// 남은 사용자 소리도 모두 삭제한다(테스트에서 2개를 추가했다)
+for (let attempt = 0; attempt < 3; attempt += 1) {
+  const remaining = await evaluate(`document.querySelectorAll('button[aria-label="삭제"]').length`)
+  if (!remaining) break
+  await clickAria('삭제')
+  await sleep(250)
+  await clickAria('삭제')
+  await sleep(400)
+}
+await waitFor(async () => (await text()).includes('내 소리 0개'), '소리 삭제', 10000)
 check('추가한 소리를 삭제할 수 있다', (await text()).includes('내 소리 0개'))
 
 await clickNav(0)

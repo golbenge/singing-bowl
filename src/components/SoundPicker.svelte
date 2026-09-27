@@ -102,14 +102,13 @@
 
     <input
       bind:this={fileInput}
-      class="hidden-input"
       type="file"
-      accept="audio/*"
       multiple
       onchange={addFiles}
       style="display:none"
     />
     <button class="btn block" onclick={() => fileInput?.click()}>＋ 음향 파일 추가</button>
+    <div class="tiny muted">mp3 · m4a · wav 파일을 지원합니다. (파일 앱의 iCloud Drive · On My iPhone)</div>
 
     {#if error}
       <div class="toast"><span class="grow">{error}</span></div>

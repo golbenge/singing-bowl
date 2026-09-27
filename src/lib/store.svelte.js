@@ -181,17 +181,18 @@ export class AppStore {
 
   /* ---------------------------------- 소리 ---------------------------------- */
 
-  /** 사용자가 고른 음향 파일들을 저장한다. 추가 즉시 디코딩해 형식을 검증한다. */
+  /**
+   * 사용자가 고른 음향 파일들을 저장한다.
+   *
+   * 파일 이름/확장자로 미리 걸러내지 않고 **실제로 디코딩되는지**로 판단한다.
+   * (iOS 파일 선택기는 accept 필터 때문에 재생 가능한 파일도 선택할 수 없게 만들 수 있다.)
+   */
   async addSoundFiles(fileList) {
     const files = [...fileList]
     const added = []
     const failed = []
 
     for (const file of files) {
-      if (!isAudioFile(file)) {
-        failed.push(`${file.name}(지원하지 않는 형식)`)
-        continue
-      }
       try {
         const arrayBuffer = await file.arrayBuffer()
         const info = await probeAudio(getAudioContext(), arrayBuffer)
@@ -210,12 +211,15 @@ export class AppStore {
         await db.putOne(db.SOUNDS, record)
         this.sounds = [...this.sounds, record]
         added.push(record)
-      } catch (error) {
-        failed.push(`${file.name}(${error?.message ?? '해석 실패'})`)
+      } catch {
+        const hint = isAudioFile(file)
+          ? '아이폰에서 읽을 수 없는 형식입니다. mp3 · m4a · wav 로 변환해 주세요.'
+          : '소리 파일로 읽을 수 없습니다. mp3 · m4a · wav 파일인지 확인해 주세요.'
+        failed.push(`${file.name} → ${hint}`)
       }
     }
 
-    this.error = failed.length ? `추가하지 못한 파일: ${failed.join(', ')}` : null
+    this.error = failed.length ? `추가하지 못한 파일: ${failed.join(' / ')}` : null
     return added
   }
 
