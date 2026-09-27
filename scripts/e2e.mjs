@@ -429,9 +429,26 @@ const clickNav = async (which) => {
   await sleep(150)
 }
 
-// 소리 보관함 (목록으로 이동 후 하단 탭)
+// 소리 화면 (목록으로 이동 후 하단 탭)
 await click('‹')
 await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 목록으로 복귀')
+
+// 탭 아이콘 및 바닥 붙음 검증 (목록 화면에서 탭이 보임)
+const navMetrics = await evaluate(`(() => {
+  const nav = document.querySelector('.bottom-nav')
+  if (!nav) return null
+  const rect = nav.getBoundingClientRect()
+  const icons = nav.querySelectorAll('svg.tab-icon')
+  return {
+    fixed: getComputedStyle(nav).position === 'fixed',
+    bottom: Math.round(rect.bottom),
+    windowH: window.innerHeight,
+    iconCount: icons.length,
+  }
+})()`)
+check('하단 탭이 fixed 로 화면 바닥에 고정된다', navMetrics?.fixed)
+check('하단 탭에 SVG 아이콘 2개가 렌더링된다', navMetrics?.iconCount === 2, `개수 ${navMetrics?.iconCount}`)
+
 await clickNav(1)
 await waitFor(async () => (await text()).includes('앱에 포함된 샘플 소리'), '소리 화면')
 const libraryText = await text()

@@ -236,11 +236,23 @@
 
   {#if view === 'timers' || view === 'sounds'}
     <nav class="bottom-nav">
-      <button class={view === 'timers' ? 'active' : ''} onclick={openTimers}>
-        <span class="icon">🕉</span>타이머
+      <button class={view === 'timers' ? 'active' : ''} onclick={openTimers} aria-label="타이머">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="13" r="8"></circle>
+          <path d="M12 9v4l2.5 2.5"></path>
+          <path d="M12 5V2"></path>
+          <path d="M10 2h4"></path>
+          <path d="M19 6l-1.5 1.5"></path>
+        </svg>
+        <span>타이머</span>
       </button>
-      <button class={view === 'sounds' ? 'active' : ''} onclick={openSounds}>
-        <span class="icon">🔔</span>소리
+      <button class={view === 'sounds' ? 'active' : ''} onclick={openSounds} aria-label="소리">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+        <span>소리</span>
       </button>
     </nav>
   {/if}
