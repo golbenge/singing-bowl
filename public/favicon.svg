@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Singing Bowl">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1a21" />
+      <stop offset="1" stop-color="#0b0b0f" />
+    </linearGradient>
+    <linearGradient id="bowl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe7a5" />
+      <stop offset="0.45" stop-color="#d8a344" />
+      <stop offset="1" stop-color="#6d4718" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" fill="url(#bg)" />
+  <g fill="none" stroke="#ffd88a" stroke-linecap="round">
+    <path d="M31 20.6a9.5 9.5 0 0 0 2 0" stroke-width="2.6" opacity="0.85" />
+    <path d="M11.5 30a21 21 0 0 1 41 0" stroke-width="2.6" opacity="0.6" />
+    <path d="M6.5 34a26 26 0 0 1 51 0" stroke-width="2.6" opacity="0.4" />
+    <path d="M2 38a31 31 0 0 1 60 0" stroke-width="2.6" opacity="0.22" />
+  </g>
+  <path d="M19.2 38.4h25.6v1.2a12.8 12.8 0 0 1-25.6 0z" fill="url(#bowl)" />
+  <ellipse cx="32" cy="38.4" rx="13.6" ry="4.2" fill="#d8a344" />
+  <ellipse cx="32" cy="38.4" rx="10.4" ry="2.6" fill="url(#bg)" />
+  <ellipse cx="32" cy="37.6" rx="13.6" ry="4.2" fill="none" stroke="#ffe9b8" stroke-width="1.1" />
+</svg>

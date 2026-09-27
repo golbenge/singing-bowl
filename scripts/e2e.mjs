@@ -1,0 +1,513 @@
+/**
+ * 의존성 없는 간단한 E2E 테스트.
+ *  - 로컬 Chrome을 headless 로 띄우고 CDP(WebSocket)로 조작/검증한다.
+ *  - 실행: node scripts/e2e.mjs [url]
+ */
+import { spawn } from 'node:child_process'
+import { rmSync } from 'node:fs'
+
+const URL_UNDER_TEST = process.argv[2] ?? 'http://127.0.0.1:4173/singing-bowl/'
+const PORT = 9333
+const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const PROFILE = '/tmp/sb-e2e-profile'
+
+rmSync(PROFILE, { recursive: true, force: true })
+
+const chrome = spawn(
+  CHROME,
+  [
+    '--headless=new',
+    `--remote-debugging-port=${PORT}`,
+    `--user-data-dir=${PROFILE}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-gpu',
+    '--mute-audio',
+    '--autoplay-policy=no-user-gesture-required',
+    'about:blank',
+  ],
+  { stdio: 'ignore' },
+)
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function findPageTarget() {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${PORT}/json/list`)
+      const targets = await response.json()
+      const page = targets.find((target) => target.type === 'page')
+      if (page) return page
+    } catch {
+      /* 아직 준비되지 않음 */
+    }
+    await sleep(250)
+  }
+  throw new Error('Chrome 디버깅 포트에 연결하지 못했습니다.')
+}
+
+const target = await findPageTarget()
+const socket = new WebSocket(target.webSocketDebuggerUrl)
+await new Promise((resolve, reject) => {
+  socket.addEventListener('open', resolve, { once: true })
+  socket.addEventListener('error', reject, { once: true })
+})
+
+let messageId = 0
+const pending = new Map()
+const consoleErrors = []
+
+socket.addEventListener('message', (event) => {
+  const message = JSON.parse(event.data)
+  if (message.id && pending.has(message.id)) {
+    const { resolve, reject } = pending.get(message.id)
+    pending.delete(message.id)
+    if (message.error) reject(new Error(JSON.stringify(message.error)))
+    else resolve(message.result)
+    return
+  }
+  if (message.method === 'Runtime.exceptionThrown') {
+    const details = message.params.exceptionDetails
+    const line = `exception: ${details.exception?.description ?? details.text}`
+    consoleErrors.push(line)
+    console.log(`[browser] ${line.split('\n')[0]}`)
+  }
+  if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
+    const line = `console.error: ${message.params.args.map((arg) => arg.value ?? arg.description).join(' ')}`
+    consoleErrors.push(line)
+    console.log(`[browser] ${line.split('\n')[0]}`)
+  }
+  if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') {
+    const line = `log: ${message.params.entry.text}`
+    consoleErrors.push(line)
+    console.log(`[browser] ${line.split('\n')[0]}`)
+  }
+})
+
+function send(method, params = {}) {
+  const id = (messageId += 1)
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject })
+    socket.send(JSON.stringify({ id, method, params }))
+  })
+}
+
+async function evaluate(expression, { userGesture = false } = {}) {
+  const result = await send('Runtime.evaluate', {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+    userGesture,
+  })
+  if (result.exceptionDetails) {
+    throw new Error(
+      `평가 실패: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`,
+    )
+  }
+  return result.result.value
+}
+
+const clickButton = (text) => `(() => {
+  const normalize = (value) => value.replace(/\\s+/g, ' ').trim()
+  const buttons = [...document.querySelectorAll('button')]
+  const el = buttons.find((button) => normalize(button.textContent).includes(${JSON.stringify(text)}))
+  if (!el) return 'NOT_FOUND'
+  if (el.disabled) return 'DISABLED'
+  el.click()
+  return 'OK'
+})()`
+
+async function click(label, { userGesture = false } = {}) {
+  const result = await evaluate(clickButton(label), { userGesture })
+  if (result !== 'OK') throw new Error(`버튼 클릭 실패(${label}): ${result}`)
+  await sleep(150)
+}
+
+const text = () => evaluate('document.body.innerText')
+
+async function waitFor(predicate, description, timeoutMs = 6000) {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    if (await predicate()) return true
+    await sleep(150)
+  }
+  throw new Error(`시간 초과: ${description}`)
+}
+
+const checks = []
+function check(name, condition, detail = '') {
+  checks.push({ name, ok: !!condition, detail })
+  console.log(`${condition ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
+}
+
+process.on('uncaughtException', async (error) => {
+  console.log(`\n중단(예외): ${error?.message}`)
+  await report()
+})
+process.on('unhandledRejection', async (error) => {
+  console.log(`\n중단(거부): ${error?.message}`)
+  await report()
+})
+
+async function report() {
+  const failed = checks.filter((entry) => !entry.ok)
+  console.log(`\n결과: ${checks.length - failed.length}/${checks.length} 통과`)
+  if (consoleErrors.length) {
+    console.log('\n콘솔 오류:')
+    for (const error of consoleErrors) console.log(` - ${error}`)
+  }
+  try {
+    socket.close()
+  } catch {
+    /* noop */
+  }
+  chrome.kill()
+  process.exit(1)
+}
+
+/* --------------------------------- 테스트 --------------------------------- */
+
+await send('Runtime.enable')
+await send('Log.enable')
+await send('Page.enable')
+await send('Page.navigate', { url: URL_UNDER_TEST })
+await sleep(1800)
+
+await waitFor(async () => (await text()).includes('아침 명상'), '첫 화면 렌더링')
+check('앱이 처음 실행되면 예시 프로젝트가 보인다', (await text()).includes('아침 명상'))
+
+// 소리 스케줄링 검증용 계측
+await evaluate(`(() => {
+  window.__scheduled = []
+  const nativeStart = AudioBufferSourceNode.prototype.start
+  AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
+    try {
+      window.__scheduled.push({
+        when,
+        now: this.context.currentTime,
+        duration: this.buffer ? this.buffer.duration : 0,
+      })
+    } catch {}
+    return nativeStart.call(this, when, offset, duration)
+  }
+  return true
+})()`)
+
+// 새 프로젝트 생성 → 0:02 / 5:02 두 개의 시간
+await click('＋ 새 프로젝트')
+await waitFor(async () => (await text()).includes('프로젝트 이름'), '새 프로젝트 모달')
+await evaluate(`(() => {
+  const input = document.querySelector('.sheet input.input')
+  input.value = 'E2E 테스트'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  return input.value
+})()`)
+await click('만들기')
+await waitFor(
+  async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
+  '편집 화면 진입',
+)
+const createdName = await evaluate(`document.querySelector('input.input')?.value ?? ''`)
+check('만든 프로젝트 이름이 편집 화면에 보인다', createdName === 'E2E 테스트', createdName)
+
+const edited = await evaluate(`(() => {
+  const inputs = [...document.querySelectorAll('input[type="number"].time')]
+  if (inputs.length < 2) return 'NO_INPUTS'
+  const [minutes, seconds] = inputs
+  minutes.value = '0'
+  minutes.dispatchEvent(new Event('input', { bubbles: true }))
+  seconds.value = '2'
+  seconds.dispatchEvent(new Event('input', { bubbles: true }))
+  return 'OK'
+})()`)
+check('시간 입력 필드를 수정할 수 있다', edited === 'OK', edited)
+await sleep(400)
+check('첫 번째 시간이 0:02 로 바뀐다', (await text()).includes('0:02'))
+
+await click('＋5분')
+await sleep(400)
+check('두 번째 시간이 5:02 로 추가된다', (await text()).includes('5:02'))
+
+// 프로젝트 기본 소리 바꾸기(모든 시간대에 같은 소리 사용)
+const openedDefaultPicker = await evaluate(`(() => {
+  const chip = document.querySelector('article.card button.chip')
+  if (!chip) return 'NO_CHIP'
+  chip.click()
+  return 'OK'
+})()`)
+check('기본 소리 버튼을 누를 수 있다', openedDefaultPicker === 'OK', openedDefaultPicker)
+await waitFor(async () => (await text()).includes('기본 소리 선택'), '기본 소리 시트')
+await click('징')
+await sleep(400)
+const defaultChipText = await evaluate(
+  `document.querySelector('article.card button.chip')?.textContent.trim() ?? ''`,
+)
+check('기본 소리를 징으로 바꿀 수 있다', defaultChipText.includes('징'), defaultChipText)
+
+await sleep(800) // 자동 저장 대기
+
+// 실행
+await click('이 프로젝트 실행')
+await waitFor(async () => (await text()).includes('타이머 시작'), '실행 전 화면')
+await click('▶ 타이머 시작', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '실행 중 화면', 12000)
+check('시작하면 실행 화면으로 바뀐다', (await text()).includes('일시 중지'))
+
+await sleep(2000)
+const scheduled = await evaluate('window.__scheduled')
+check(
+  '기본 소리(징)가 모든 시간대에 적용된다',
+  scheduled.length >= 2 && scheduled.every((entry) => entry.duration > 12),
+  JSON.stringify(scheduled.map((entry) => entry.duration)),
+)
+const near2 = scheduled.find((entry) => Math.abs(entry.when - entry.now - 2) < 0.5)
+const near302 = scheduled.find((entry) => Math.abs(entry.when - entry.now - 302) < 1.5)
+check(
+  '0:02 소리가 정확한 시각으로 예약된다',
+  !!near2,
+  near2 ? `when-now=${(near2.when - near2.now).toFixed(3)}s` : JSON.stringify(scheduled),
+)
+check(
+  '5:02 소리도 함께 예약된다',
+  !!near302,
+  near302 ? `when-now=${(near302.when - near302.now).toFixed(3)}s` : '',
+)
+
+const audioState = await evaluate(`(() => {
+  const keepAlive = document.querySelector('audio')
+  return {
+    keepAlivePaused: keepAlive ? keepAlive.paused : null,
+    metadata: navigator.mediaSession?.metadata?.title ?? null,
+  }
+})()`)
+check(
+  '잠금 화면용 무음 루프가 재생 중이다',
+  audioState.keepAlivePaused === false,
+  JSON.stringify(audioState),
+)
+check('Media Session 제목이 프로젝트 이름이다', audioState.metadata === 'E2E 테스트', String(audioState.metadata))
+
+await waitFor(async () => (await text()).includes('재생됨'), '첫 소리 재생 완료 표시', 8000)
+check('소리가 재생되면 재생됨으로 표시된다', (await text()).includes('재생됨'))
+
+const elapsedText = await evaluate(`document.querySelector('.big-time').textContent.trim()`)
+check('경과 시간이 표시된다', /^0:0[2-9]$/.test(elapsedText), elapsedText)
+
+// 일시 중지 / 재개
+await click('일시 중지')
+await sleep(400)
+check('일시 중지 상태가 표시된다', (await text()).includes('일시 중지됨'))
+const pausedAt = await evaluate(`document.querySelector('.big-time').textContent.trim()`)
+await sleep(1300)
+const stillPaused = await evaluate(`document.querySelector('.big-time').textContent.trim()`)
+check('일시 중지 중에는 시간이 멈춘다', pausedAt === stillPaused, `${pausedAt} / ${stillPaused}`)
+
+const beforeResume = (await evaluate('window.__scheduled')).length
+await click('▶ 이어서', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '재개 후 실행 화면', 8000)
+await sleep(800)
+const afterResume = (await evaluate('window.__scheduled')).length
+check('재개하면 남은 소리가 다시 예약된다', afterResume > beforeResume, `${beforeResume} → ${afterResume}`)
+
+// 종료
+await click('■ 종료')
+await sleep(500)
+check('종료하면 시작 화면으로 돌아온다', (await text()).includes('타이머 시작'))
+
+const clickNav = async (which) => {
+  const result = await evaluate(
+    `(() => {
+      const nav = document.querySelector('.bottom-nav')
+      if (!nav) return 'NO_NAV'
+      const button = nav.querySelectorAll('button')[${which}]
+      if (!button) return 'NO_BUTTON'
+      button.click()
+      return 'OK'
+    })()`,
+  )
+  if (result !== 'OK') throw new Error(`하단 탭 클릭 실패(${which}): ${result}`)
+  await sleep(150)
+}
+
+// 소리 보관함 (목록으로 이동 후 하단 탭)
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록으로 복귀')
+await clickNav(1)
+await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+const libraryText = await text()
+check(
+  '내장 소리 6종이 표시된다',
+  ['싱잉볼', '큰 종', '징', '방울', '목탁', '알림음'].every((name) => libraryText.includes(name)),
+)
+
+// 사용자 음향 파일 추가(IndexedDB 저장 + 디코딩 검증)
+const fileResult = await evaluate(`(() => {
+  const sampleRate = 8000
+  const frames = sampleRate / 2
+  const buffer = new ArrayBuffer(44 + frames * 2)
+  const view = new DataView(buffer)
+  const text = (offset, value) => {
+    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i))
+  }
+  text(0, 'RIFF')
+  view.setUint32(4, 36 + frames * 2, true)
+  text(8, 'WAVE')
+  text(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  text(36, 'data')
+  view.setUint32(40, frames * 2, true)
+  for (let i = 0; i < frames; i += 1) {
+    view.setInt16(44 + i * 2, Math.round(Math.sin((i / sampleRate) * 2 * Math.PI * 440) * 12000), true)
+  }
+  const file = new File([buffer], 'tone-test.wav', { type: 'audio/wav' })
+  const input = document.querySelector('input[type=file]')
+  if (!input) return 'NO_INPUT'
+  const transfer = new DataTransfer()
+  transfer.items.add(file)
+  input.files = transfer.files
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+  return 'OK'
+})()`)
+check('음향 파일 입력이 존재한다', fileResult === 'OK', fileResult)
+
+await waitFor(async () => (await text()).includes('tone-test'), '내 소리에 파일 추가', 8000)
+const afterUpload = await text()
+check('추가한 파일이 내 소리에 표시된다', afterUpload.includes('tone-test'))
+check('추가한 파일 길이가 표시된다(0.5초 → 0:01)', afterUpload.includes('0:01'))
+check('내 소리 개수가 늘어난다', afterUpload.includes('내 소리 1개'))
+
+// 저장(IndexedDB) 확인
+await send('Page.reload')
+await sleep(2000)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '새로고침 후 목록')
+await clickNav(1)
+await waitFor(async () => (await text()).includes('소리 보관함'), '새로고침 후 소리 보관함')
+await waitFor(async () => (await text()).includes('tone-test'), '새로고침 후 파일 유지')
+check('새로고침해도 추가한 파일이 남아 있다', (await text()).includes('tone-test'))
+
+// 프로젝트에서 사용자 소리를 지정한 뒤 삭제하면 기본 소리로 되돌아간다
+const clickAria = async (label) => {
+  const result = await evaluate(`(() => {
+    const el = document.querySelector('button[aria-label=${JSON.stringify(label)}]')
+    if (!el) return 'NOT_FOUND'
+    el.click()
+    return 'OK'
+  })()`)
+  if (result !== 'OK') throw new Error(`버튼 클릭 실패(${label}): ${result}`)
+  await sleep(150)
+}
+
+await clickNav(0)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+await click('E2E 테스트')
+await waitFor(
+  async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
+  '편집 화면',
+)
+const pickedCueSound = await evaluate(`(() => {
+  const chip = [...document.querySelectorAll('button.chip')].find((button) =>
+    button.textContent.includes('기본 소리 ('),
+  )
+  if (!chip) return 'NO_CHIP'
+  chip.click()
+  return 'OK'
+})()`)
+check('큐의 소리 선택 버튼이 있다', pickedCueSound === 'OK', pickedCueSound)
+await waitFor(async () => (await text()).includes('이 시간대에 쓸 소리'), '소리 선택 시트')
+await click('tone-test')
+await sleep(400)
+check('큐에 사용자 소리를 지정할 수 있다', (await text()).includes('tone-test'))
+
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await clickNav(1)
+await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+await clickAria('삭제')
+await sleep(200)
+await clickAria('삭제')
+await waitFor(async () => (await text()).includes('내 소리 0개'), '소리 삭제', 8000)
+check('추가한 소리를 삭제할 수 있다', (await text()).includes('내 소리 0개'))
+
+await clickNav(0)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+await click('E2E 테스트')
+await waitFor(
+  async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
+  '편집 화면',
+)
+check(
+  '삭제된 소리를 쓰던 큐는 기본 소리로 돌아온다',
+  (await text()).includes('기본 소리 ('),
+)
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+
+// 중단된 실행 복구: 실행 중 새로고침하면 이어서 재생할 수 있어야 한다
+await clickNav(0)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+const startedSecondRun = await evaluate(
+  `(() => {
+    const card = [...document.querySelectorAll('article.card')].find((el) => el.textContent.includes('E2E 테스트'))
+    if (!card) return 'NO_CARD'
+    const button = card.querySelector('button.btn.play')
+    if (!button) return 'NO_BUTTON'
+    button.click()
+    return 'OK'
+  })()`,
+  { userGesture: true },
+)
+check('목록에서 다시 실행할 수 있다', startedSecondRun === 'OK', startedSecondRun)
+await waitFor(async () => (await text()).includes('타이머 시작'), '실행 전 화면')
+await click('▶ 타이머 시작', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '실행 중 화면', 12000)
+await sleep(1500)
+
+await send('Page.reload')
+await sleep(2000)
+await waitFor(async () => (await text()).includes('중단되었던 타이머'), '중단된 실행 안내')
+check('새로고침하면 중단된 실행을 안내한다', (await text()).includes('중단되었던 타이머가 있습니다'))
+
+await click('이어서 재생', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '복구 후 실행 화면', 12000)
+const resumedElapsed = await evaluate(`document.querySelector('.big-time').textContent.trim()`)
+check('복구 후 실행 화면으로 이어진다', /^0:0[1-9]$/.test(resumedElapsed), resumedElapsed)
+await click('■ 종료')
+await sleep(400)
+
+// 새로고침 후 데이터 유지 확인
+await click('‹')
+await waitFor(async () => (await text()).includes('E2E 테스트'), '목록 복귀')
+const afterReload = await text()
+check('새로고침해도 프로젝트가 남아 있다', afterReload.includes('E2E 테스트'))
+await click('E2E 테스트')
+await waitFor(
+  async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
+  '편집 화면',
+)
+const persistedTimes = await evaluate(
+  `[...document.querySelectorAll('input[type="number"].time')].map((input) => input.value).join(':')`,
+)
+check('시간 설정도 유지된다', persistedTimes.startsWith('0:2'), persistedTimes)
+
+/* --------------------------------- 결과 ---------------------------------- */
+
+await reportWithStatus(0)
+
+async function reportWithStatus(exitCode) {
+  const failed = checks.filter((entry) => !entry.ok)
+  console.log(`\n결과: ${checks.length - failed.length}/${checks.length} 통과`)
+  if (consoleErrors.length) {
+    console.log('\n콘솔 오류:')
+    for (const error of consoleErrors) console.log(` - ${error}`)
+  }
+  socket.close()
+  chrome.kill()
+  process.exit(failed.length ? 1 : exitCode)
+}
+
