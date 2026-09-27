@@ -66,21 +66,24 @@ p {
 /* ---------------------------------- 레이아웃 --------------------------------- */
 
 /*
- * iOS Standalone PWA의 Viewport Oscillation(초기 렌더링 시 innerHeight 오계산으로
- * 하단 탭이 공중에 붕 떠 있다가 쓸어내리면 바닥으로 스냅되는 버그)을 방지하기 위해
- * 앱 셸 자체를 화면 프레임(inset: 0)에 고정하고 내부 본문만 스크롤하도록 구성한다.
+ * iOS 홈 화면 앱(standalone PWA)의 safe-area 문제는 CSS env()나
+ * display-mode 미디어쿼리만으로 해결되지 않는다. 실측 결과:
+ *  - env(safe-area-inset-top)이 0으로 잡히는 경우가 있다
+ *  - @media (display-mode: standalone)이 매칭되지 않는 경우가 있다
+ * 그래서 JS로 standalone 여부를 감지해 html.is-standalone 클래스를 붙이고,
+ * CSS env() 값을 그대로 쓰고, Safari와 동일한 12px/10px 기준으로 맞춘다.
+ * (status-bar-style=black 이면 iOS가 상태바 영역을 미리 비워 주므로 강제 최소값 불필요)
  */
 .app-shell {
-  position: fixed;
-  inset: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .app-header {
-  flex-shrink: 0;
+  position: sticky;
+  top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -121,22 +124,29 @@ p {
   flex: 1;
 }
 
+/*
+ * 하단 탭바: 화면 하단에 고정(fixed). Safari/standalone 모두 동일하게 동작하고,
+ * 본문(.app-main) 하단 여백으로 탭바 높이만큼 확보해 콘텐츠가 가려지지 않게 한다.
+ * iOS 초기 렌더링 시 innerHeight 오계산으로 탭이 붕 뜨는 버그가 있지만,
+ * fixed + bottom:0 조합이 sticky보다 바닥에 확실히 붙는다.
+ */
 .app-main {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 14px 14px 24px;
+  padding: 14px 14px calc(96px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .app-main.no-padding {
-  padding: 0;
+  padding: 0 0 calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 .bottom-nav {
-  flex-shrink: 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 20;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -149,18 +159,16 @@ p {
 }
 
 /*
- * iPhone / iPad 홈 화면 앱(standalone PWA) 전용 스타일:
- * 상태바(노치 / 다이내믹 아일랜드) 및 홈 바(Home Indicator) 영역을 넉넉하게 확보하여
- * 글자가 상태바와 겹치거나 잘리지 않도록 한다.
+ * iPhone / iPad 홈 화면 앱(standalone PWA): JS가 붙이는 html.is-standalone
+ * 클래스 기준으로 상·하단 여백을 확보한다. Safari와 동일한 기준으로
+ * env() + 12px(상단) / + 10px(하단)을 적용한다.
  */
-@media all and (display-mode: standalone) {
-  .app-header {
-    padding-top: max(calc(env(safe-area-inset-top) + 16px), 64px);
-  }
+html.is-standalone .app-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+}
 
-  .bottom-nav {
-    padding-bottom: max(calc(env(safe-area-inset-bottom) + 8px), 24px);
-  }
+html.is-standalone .bottom-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
 }
 
 .bottom-nav button {

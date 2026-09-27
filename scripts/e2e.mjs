@@ -441,13 +441,15 @@ const navMetrics = await evaluate(`(() => {
   const rect = nav.getBoundingClientRect()
   const icons = nav.querySelectorAll('svg.tab-icon')
   return {
-    shellFixed: getComputedStyle(shell).position === 'fixed',
+    shellDisplay: getComputedStyle(shell).display === 'flex',
+    navFixed: getComputedStyle(nav).position === 'fixed',
     bottom: Math.round(rect.bottom),
     windowH: window.innerHeight,
     iconCount: icons.length,
   }
 })()`)
-check('앱 셸이 fixed inset-0 로 화면 프레임에 고정된다', navMetrics?.shellFixed)
+check('앱 셸이 flex 컬럼 레이아웃으로 구성된다', navMetrics?.shellDisplay)
+check('하단 탭이 fixed로 바닥에 고정된다', navMetrics?.navFixed)
 check('하단 탭이 화면 바닥에 정확히 위치한다', Math.abs((navMetrics?.bottom ?? 0) - (navMetrics?.windowH ?? 0)) <= 1)
 check('하단 탭에 SVG 아이콘 2개가 렌더링된다', navMetrics?.iconCount === 2, `개수 ${navMetrics?.iconCount}`)
 
