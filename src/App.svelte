@@ -8,7 +8,7 @@
     dismissUpdate,
     registerAppUpdater,
   } from './lib/app-update.svelte.js'
-  import { formatDuration } from './lib/time.js'
+  import { formatDuration, formatIsoDateTime } from './lib/time.js'
   import ProjectList from './components/ProjectList.svelte'
   import ProjectEditor from './components/ProjectEditor.svelte'
   import Runner from './components/Runner.svelte'
@@ -123,7 +123,9 @@
           {activeProject.cues.length}개 소리 · 기본 {store.soundName(activeProject.defaultSoundId)}
         </div>
       {:else if view === 'sounds'}
-        <div class="subtitle">오프라인 · 이 폰에만 저장</div>
+        <div class="subtitle truncate">
+          오프라인 · 이 폰에만 저장 · 빌드 {formatIsoDateTime(appUpdate.buildTime)}
+        </div>
       {/if}
     </div>
 

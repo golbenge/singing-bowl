@@ -89,6 +89,35 @@
   }
 </script>
 
+<div class="card stack">
+  <div class="row-between">
+    <strong class="small">앱 정보 · 업데이트</strong>
+    {#if appUpdate.needRefresh}
+      <span class="badge accent">새 버전 있음</span>
+    {:else}
+      <span class="badge done">최신 버전</span>
+    {/if}
+  </div>
+  <div class="small muted">빌드 시각: {formatIsoDateTime(appUpdate.buildTime)}</div>
+  <div class="small muted">
+    마지막 확인: {appUpdate.lastCheckedAt ? formatDateTime(appUpdate.lastCheckedAt) : '확인 중…'}
+  </div>
+  <div class="tiny muted">
+    홈 화면 앱에는 브라우저 새로고침 버튼이 없습니다. 새 버전이 나오면 화면 위쪽에 안내가 뜨고, 그때
+    <strong>지금 새로고침</strong>을 누르면 됩니다. 안내가 보이지 않으면 아래 ‘업데이트 확인’을 눌러 보세요.
+    그래도 그대로면 홈 화면 앱을 완전히 종료(앱 전환기에서 위로 밀기)한 뒤 다시 열면 최신 버전으로 실행됩니다.
+  </div>
+  <div class="row">
+    <button class="btn grow" onclick={() => checkForUpdate(true)} disabled={appUpdate.checking}>
+      {appUpdate.checking ? '확인하는 중…' : '업데이트 확인'}
+    </button>
+    <button class="btn grow" onclick={refreshApp}>앱 새로고침</button>
+  </div>
+  {#if appUpdate.lastError}
+    <div class="tiny muted">확인 실패: {appUpdate.lastError} (오프라인이면 정상입니다)</div>
+  {/if}
+</div>
+
 <div class="notice">
   <span>📴</span>
   <span class="grow small">
@@ -205,35 +234,6 @@
   </div>
   {#if !persisted}
     <button class="btn block" onclick={requestPersist}>영구 저장 요청</button>
-  {/if}
-</div>
-
-<div class="card stack">
-  <div class="row-between">
-    <strong class="small">앱 정보</strong>
-    {#if appUpdate.needRefresh}
-      <span class="badge accent">새 버전 있음</span>
-    {:else}
-      <span class="badge done">최신 버전</span>
-    {/if}
-  </div>
-  <div class="small muted">빌드 시각: {formatIsoDateTime(appUpdate.buildTime)}</div>
-  <div class="small muted">
-    마지막 확인: {appUpdate.lastCheckedAt ? formatDateTime(appUpdate.lastCheckedAt) : '확인 중…'}
-  </div>
-  <div class="tiny muted">
-    홈 화면 앱에는 브라우저 새로고침 버튼이 없습니다. 새 버전이 나오면 위쪽에 ‘새 버전이 있습니다’ 안내가
-    뜨고, 그때 <strong>지금 새로고침</strong>을 누르면 됩니다. 안내가 보이지 않으면 아래 ‘업데이트 확인’을 눌러 보세요.
-    그래도 안 되면 홈 화면 앱을 완전히 종료(앱 전환기에서 위로 밀기)한 뒤 다시 열면 최신 버전으로 실행됩니다.
-  </div>
-  <div class="row">
-    <button class="btn grow" onclick={() => checkForUpdate(true)} disabled={appUpdate.checking}>
-      {appUpdate.checking ? '확인하는 중…' : '업데이트 확인'}
-    </button>
-    <button class="btn grow" onclick={refreshApp}>앱 새로고침</button>
-  </div>
-  {#if appUpdate.lastError}
-    <div class="tiny muted">확인 실패: {appUpdate.lastError} (오프라인이면 정상입니다)</div>
   {/if}
 </div>
 

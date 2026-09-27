@@ -697,6 +697,11 @@ const appInfoText = await text()
 check('앱 정보 카드에 빌드 시각이 표시된다', appInfoText.includes('빌드 시각'), '')
 check('업데이트 확인 버튼이 있다', appInfoText.includes('업데이트 확인'))
 check('앱 새로고침 버튼이 있다', appInfoText.includes('앱 새로고침'))
+check(
+  '앱 정보 카드가 소리 보관함 상단에 있다(스크롤 없이 보임)',
+  appInfoText.indexOf('앱 정보') < appInfoText.indexOf('내 소리'),
+  `앱 정보 위치 ${appInfoText.indexOf('앱 정보')}, 내 소리 위치 ${appInfoText.indexOf('내 소리')}`,
+)
 
 // --------------------------- 오프라인 동작 검증 ---------------------------
 await send('Network.enable')
