@@ -703,6 +703,26 @@ check(
   `앱 정보 위치 ${appInfoText.indexOf('앱 정보')}, 내 소리 위치 ${appInfoText.indexOf('내 소리')}`,
 )
 
+// 데이터 저장(영구 저장) 카드
+check(
+  '데이터 저장 카드에 상태 배지가 있다(영구/일반)',
+  appInfoText.includes('영구 저장 사용 중') || appInfoText.includes('일반 저장'),
+)
+check('데이터 저장 안내에 홈 화면 앱 설명이 있다', appInfoText.includes('홈 화면에 추가한 앱'))
+
+const hasPersistButton = await evaluate(
+  `[...document.querySelectorAll('button')].some((el) => el.textContent.includes('영구 저장 요청'))`,
+)
+if (hasPersistButton) {
+  await click('영구 저장 요청')
+  await sleep(800)
+  const persistResult = await text()
+  check(
+    '영구 저장 요청 결과를 안내한다(적용 또는 거부)',
+    persistResult.includes('영구 저장이 적용되었습니다') || persistResult.includes('허용되지 않았습니다'),
+  )
+}
+
 // --------------------------- 오프라인 동작 검증 ---------------------------
 await send('Network.enable')
 offlinePhase.value = true

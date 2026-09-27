@@ -17,8 +17,13 @@
   let confirmingId = $state(null)
   let storage = $state(null)
   let persisted = $state(null)
+  let requestingPersist = $state(false)
+  let persistMessage = $state('')
+  let isStandalone = $state(false)
 
   onMount(async () => {
+    isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
     storage = await store.storageEstimate()
     try {
       persisted = (await navigator.storage?.persisted?.()) ?? null
@@ -79,7 +84,14 @@
   }
 
   async function requestPersist() {
-    persisted = await store.requestPersistence()
+    requestingPersist = true
+    persistMessage = ''
+    const granted = await store.requestPersistence()
+    persisted = granted
+    requestingPersist = false
+    persistMessage = granted
+      ? '영구 저장이 적용되었습니다. 이제 브라우저가 임의로 데이터를 지우지 않습니다.'
+      : '이 브라우저(탭)에서는 허용되지 않았습니다. 홈 화면에 추가해 실행하면 iOS가 자동으로 영구 저장을 허용합니다.'
   }
 
   /** 새로고침 직전에 실행 중인 타이머를 일시 중지해 두면 새 버전에서 이어서 재생할 수 있다. */
@@ -223,17 +235,36 @@
 
 <div class="card stack">
   <div class="row-between">
-    <strong class="small">저장 공간</strong>
-    {#if persisted}<span class="badge done">영구 저장 사용 중</span>{:else}<span class="badge">일반 저장</span>{/if}
+    <strong class="small">데이터 저장</strong>
+    {#if persisted === true}
+      <span class="badge done">영구 저장 사용 중</span>
+    {:else if persisted === false}
+      <span class="badge">일반 저장</span>
+    {:else}
+      <span class="badge">확인 중</span>
+    {/if}
   </div>
   {#if storage}
     <div class="small muted">사용 {formatBytes(storage.usage)} / 최대 {formatBytes(storage.quota)}</div>
   {/if}
   <div class="tiny muted">
-    iPhone이 저장 공간을 정리할 때 데이터가 지워지지 않도록 ‘영구 저장’을 요청할 수 있습니다.
+    {#if persisted === true}
+      브라우저가 저장 공간을 정리할 때도 프로젝트와 추가한 음원이 자동으로 지워지지 않습니다.
+      {#if isStandalone}홈 화면 앱으로 실행 중이라 iOS가 영구 저장을 자동으로 허용했습니다.{/if}
+    {:else}
+      지금은 <strong>일반 저장(임시)</strong> 상태입니다. 저장 공간이 부족해지거나
+      <strong>7일 넘게 방문하지 않으면</strong> 사파리가 프로젝트·음원 데이터를 지울 수 있습니다.
+      iOS는 <strong>홈 화면에 추가한 앱</strong>에만 영구 저장을 자동 허용하며, 사파리 탭에서는 아래 요청이
+      거부될 수 있습니다(정상 동작입니다).
+    {/if}
   </div>
-  {#if !persisted}
-    <button class="btn block" onclick={requestPersist}>영구 저장 요청</button>
+  {#if persisted !== true}
+    <button class="btn block" onclick={requestPersist} disabled={requestingPersist}>
+      {requestingPersist ? '요청하는 중…' : '영구 저장 요청'}
+    </button>
+  {/if}
+  {#if persistMessage}
+    <div class="tiny">{persistMessage}</div>
   {/if}
 </div>
 
