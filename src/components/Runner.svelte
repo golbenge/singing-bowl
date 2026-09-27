@@ -72,7 +72,7 @@
 </script>
 
 {#if !project}
-  <div class="empty">프로젝트를 찾을 수 없습니다.</div>
+  <div class="empty">타이머를 찾을 수 없습니다.</div>
   <button class="btn block" onclick={onback}>목록으로 돌아가기</button>
 {:else if active && timer.status !== 'idle' && timer.status !== 'finished'}
   <!-- ------------------------------ 실행 중 ------------------------------ -->

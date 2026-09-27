@@ -1,12 +1,9 @@
 <script>
-  /** 소리 보관함: 앱 샘플 소리 + 사용자가 추가한 음향 파일 */
-  import { onMount } from 'svelte'
+  /** 소리: 앱 샘플 소리 + 사용자가 추가한 음향 파일 */
   import { store } from '../lib/store.svelte.js'
   import { BUNDLED_SOUNDS } from '../lib/bundled-sounds.js'
-  import { timer } from '../lib/engine.svelte.js'
-  import { appUpdate, applyUpdate, checkForUpdate } from '../lib/app-update.svelte.js'
   import { previewSound } from '../lib/audio-session.js'
-  import { formatBytes, formatDateTime, formatDuration, formatIsoDateTime } from '../lib/time.js'
+  import { formatBytes, formatDuration } from '../lib/time.js'
 
   let fileInput = $state(null)
   let busy = $state(false)
@@ -15,22 +12,6 @@
   let renamingId = $state(null)
   let renameValue = $state('')
   let confirmingId = $state(null)
-  let storage = $state(null)
-  let persisted = $state(null)
-  let requestingPersist = $state(false)
-  let persistMessage = $state('')
-  let isStandalone = $state(false)
-
-  onMount(async () => {
-    isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-    storage = await store.storageEstimate()
-    try {
-      persisted = (await navigator.storage?.persisted?.()) ?? null
-    } catch {
-      persisted = null
-    }
-  })
 
   async function addFiles(event) {
     const input = event.currentTarget
@@ -41,7 +22,6 @@
     const added = await store.addSoundFiles(files)
     if (input) input.value = ''
     busy = false
-    storage = await store.storageEstimate()
     if (store.error) error = store.error
     if (!added.length && !error) error = '추가된 파일이 없습니다.'
   }
@@ -80,60 +60,13 @@
     }
     confirmingId = null
     await store.deleteSound(sound.id)
-    storage = await store.storageEstimate()
-  }
-
-  async function requestPersist() {
-    requestingPersist = true
-    persistMessage = ''
-    const granted = await store.requestPersistence()
-    persisted = granted
-    requestingPersist = false
-    persistMessage = granted
-      ? '영구 저장이 적용되었습니다. 이제 브라우저가 임의로 데이터를 지우지 않습니다.'
-      : '이 브라우저(탭)에서는 허용되지 않았습니다. 홈 화면에 추가해 실행하면 iOS가 자동으로 영구 저장을 허용합니다.'
-  }
-
-  /** 새로고침 직전에 실행 중인 타이머를 일시 중지해 두면 새 버전에서 이어서 재생할 수 있다. */
-  function refreshApp() {
-    if (timer.status === 'running') timer.pause()
-    applyUpdate()
   }
 </script>
-
-<div class="card stack">
-  <div class="row-between">
-    <strong class="small">앱 정보 · 업데이트</strong>
-    {#if appUpdate.needRefresh}
-      <span class="badge accent">새 버전 있음</span>
-    {:else}
-      <span class="badge done">최신 버전</span>
-    {/if}
-  </div>
-  <div class="small muted">빌드 시각: {formatIsoDateTime(appUpdate.buildTime)}</div>
-  <div class="small muted">
-    마지막 확인: {appUpdate.lastCheckedAt ? formatDateTime(appUpdate.lastCheckedAt) : '확인 중…'}
-  </div>
-  <div class="tiny muted">
-    홈 화면 앱에는 브라우저 새로고침 버튼이 없습니다. 새 버전이 나오면 화면 위쪽에 안내가 뜨고, 그때
-    <strong>지금 새로고침</strong>을 누르면 됩니다. 안내가 보이지 않으면 아래 ‘업데이트 확인’을 눌러 보세요.
-    그래도 그대로면 홈 화면 앱을 완전히 종료(앱 전환기에서 위로 밀기)한 뒤 다시 열면 최신 버전으로 실행됩니다.
-  </div>
-  <div class="row">
-    <button class="btn grow" onclick={() => checkForUpdate(true)} disabled={appUpdate.checking}>
-      {appUpdate.checking ? '확인하는 중…' : '업데이트 확인'}
-    </button>
-    <button class="btn grow" onclick={refreshApp}>앱 새로고침</button>
-  </div>
-  {#if appUpdate.lastError}
-    <div class="tiny muted">확인 실패: {appUpdate.lastError} (오프라인이면 정상입니다)</div>
-  {/if}
-</div>
 
 <div class="notice">
   <span>📴</span>
   <span class="grow small">
-    추가한 음향 파일은 <strong>이 폰(IndexedDB)</strong>에만 저장됩니다. 서버로 전송되지 않으며
+    추가한 음향 파일은 <strong>이 기기(IndexedDB)</strong>에만 저장됩니다. 서버로 전송되지 않으며
     네트워크 연결이 없어도 재생됩니다.
   </span>
 </div>
@@ -218,7 +151,7 @@
     {#if confirmingId === sound.id}
       <div class="notice small">
         <span class="grow">
-          이 소리를 쓰는 곳 {store.usageCount(sound.id)}군데가 기본 소리로 바뀝니다. 삭제하려면 삭제 버튼을 한 번 더 누르세요.
+          이 소리를 쓰는 타이머 {store.usageCount(sound.id)}곳이 기본 소리로 바뀝니다. 삭제하려면 삭제 버튼을 한 번 더 누르세요.
         </span>
       </div>
     {/if}
@@ -231,41 +164,6 @@
 <div class="tiny muted">
   파일 앱(iCloud Drive · On My iPhone)에서 mp3 · m4a · wav 파일을 고르세요. 선택 목록이 비어 있으면
   파일 앱에서 그 파일을 한 번 열어 폰에 내려받은 뒤 다시 시도해 보세요. (ogg · flac 은 아이폰에서 재생되지 않습니다)
-</div>
-
-<div class="card stack">
-  <div class="row-between">
-    <strong class="small">데이터 저장</strong>
-    {#if persisted === true}
-      <span class="badge done">영구 저장 사용 중</span>
-    {:else if persisted === false}
-      <span class="badge">일반 저장</span>
-    {:else}
-      <span class="badge">확인 중</span>
-    {/if}
-  </div>
-  {#if storage}
-    <div class="small muted">사용 {formatBytes(storage.usage)} / 최대 {formatBytes(storage.quota)}</div>
-  {/if}
-  <div class="tiny muted">
-    {#if persisted === true}
-      브라우저가 저장 공간을 정리할 때도 프로젝트와 추가한 음원이 자동으로 지워지지 않습니다.
-      {#if isStandalone}홈 화면 앱으로 실행 중이라 iOS가 영구 저장을 자동으로 허용했습니다.{/if}
-    {:else}
-      지금은 <strong>일반 저장(임시)</strong> 상태입니다. 저장 공간이 부족해지거나
-      <strong>7일 넘게 방문하지 않으면</strong> 사파리가 프로젝트·음원 데이터를 지울 수 있습니다.
-      iOS는 <strong>홈 화면에 추가한 앱</strong>에만 영구 저장을 자동 허용하며, 사파리 탭에서는 아래 요청이
-      거부될 수 있습니다(정상 동작입니다).
-    {/if}
-  </div>
-  {#if persisted !== true}
-    <button class="btn block" onclick={requestPersist} disabled={requestingPersist}>
-      {requestingPersist ? '요청하는 중…' : '영구 저장 요청'}
-    </button>
-  {/if}
-  {#if persistMessage}
-    <div class="tiny">{persistMessage}</div>
-  {/if}
 </div>
 
 {#if error}

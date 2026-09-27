@@ -187,12 +187,12 @@
 </script>
 
 {#if !draft}
-  <div class="empty">프로젝트를 찾을 수 없습니다.</div>
+  <div class="empty">타이머를 찾을 수 없습니다.</div>
   <button class="btn block" onclick={onback}>목록으로 돌아가기</button>
 {:else}
   <article class="card stack">
     <div class="field">
-      <span class="label">프로젝트 이름</span>
+      <span class="label">타이머 이름</span>
       <input class="input" bind:value={draft.name} maxlength="40" enterkeyhint="done" />
     </div>
 
@@ -317,11 +317,11 @@
   {/if}
 
   <button class="btn primary lg block" disabled={!draft.cues.length} onclick={runNow}>
-    ▶ 이 프로젝트 실행
+    ▶ 이 타이머 실행
   </button>
 
   <button class="btn block danger-text" onclick={deleteProject}>
-    {confirmingDelete ? '정말 삭제할까요? 한 번 더 누르세요' : '프로젝트 삭제'}
+    {confirmingDelete ? '정말 삭제할까요? 한 번 더 누르세요' : '타이머 삭제'}
   </button>
 {/if}
 

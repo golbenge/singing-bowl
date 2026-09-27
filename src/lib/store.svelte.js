@@ -28,7 +28,7 @@ function normalizeProject(project) {
   const now = Date.now()
   return {
     id: project?.id ?? uid('project'),
-    name: project?.name?.trim() || '이름 없는 프로젝트',
+    name: project?.name?.trim() || '이름 없는 타이머',
     defaultSoundId: normalizeSoundId(project?.defaultSoundId) ?? DEFAULT_SOUND_ID,
     volume: typeof project?.volume === 'number' ? Math.min(1, Math.max(0, project.volume)) : 0.9,
     cues: Array.isArray(project?.cues)
@@ -45,7 +45,7 @@ function createProject(name, { cues, defaultSoundId } = {}) {
   const now = Date.now()
   return {
     id: uid('project'),
-    name: name?.trim() || '새 프로젝트',
+    name: name?.trim() || '새 타이머',
     defaultSoundId: defaultSoundId ?? DEFAULT_SOUND_ID,
     volume: 0.9,
     cues: (cues ?? [{ atSeconds: 300, soundId: null, label: '' }]).map(normalizeCue),

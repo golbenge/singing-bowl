@@ -25,7 +25,7 @@
   }
 
   async function createProject() {
-    const project = await store.createProject(newName || '새 프로젝트')
+    const project = await store.createProject(newName || '새 타이머')
     creating = false
     newName = ''
     onedit?.(project.id)
@@ -51,15 +51,15 @@
 </script>
 
 <div class="row-between">
-  <div class="section-title">내 프로젝트 {projects.length}개</div>
+  <div class="section-title">내 타이머 {projects.length}개</div>
   <button class="btn primary pill" onclick={() => { creating = true; newName = '' }}>
-    ＋ 새 프로젝트
+    ＋ 새 타이머
   </button>
 </div>
 
 {#if !projects.length}
   <div class="empty">
-    아직 프로젝트가 없습니다.<br />‘새 프로젝트’를 눌러 시작하세요.
+    아직 타이머가 없습니다.<br />‘새 타이머’를 눌러 시작하세요.
   </div>
 {/if}
 
@@ -96,9 +96,9 @@
 {/each}
 
 {#if creating}
-  <Modal title="새 프로젝트" onclose={() => (creating = false)}>
+  <Modal title="새 타이머" onclose={() => (creating = false)}>
     <div class="field">
-      <span class="label">프로젝트 이름</span>
+      <span class="label">타이머 이름</span>
       <input
         bind:this={newNameInput}
         bind:value={newName}
@@ -108,7 +108,7 @@
         onkeydown={(event) => event.key === 'Enter' && createProject()}
       />
     </div>
-    <div class="tiny muted">기본값: 소리 5분 뒤에 한 번 재생되는 프로젝트가 만들어집니다.</div>
+    <div class="tiny muted">기본값: 소리 5분 뒤에 한 번 재생되는 타이머가 만들어집니다.</div>
     <div class="row">
       <button class="btn ghost grow" onclick={() => (creating = false)}>취소</button>
       <button class="btn primary grow" onclick={createProject}>만들기</button>

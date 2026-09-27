@@ -291,9 +291,9 @@ await installSchedulerProbe()
 await installFileFactory()
 await sleep(300)
 
-// 새 프로젝트 생성 → 0:02 / 5:02 두 개의 시간
-await click('＋ 새 프로젝트')
-await waitFor(async () => (await text()).includes('프로젝트 이름'), '새 프로젝트 모달')
+// 새 타이머 생성 → 0:02 / 5:02 두 개의 시간
+await click('＋ 새 타이머')
+await waitFor(async () => (await text()).includes('타이머 이름'), '새 타이머 모달')
 await evaluate(`(() => {
   const input = document.querySelector('.sheet input.input')
   input.value = 'E2E 테스트'
@@ -306,7 +306,7 @@ await waitFor(
   '편집 화면 진입',
 )
 const createdName = await evaluate(`document.querySelector('input.input')?.value ?? ''`)
-check('만든 프로젝트 이름이 편집 화면에 보인다', createdName === 'E2E 테스트', createdName)
+check('만든 타이머 이름이 편집 화면에 보인다', createdName === 'E2E 테스트', createdName)
 
 const edited = await evaluate(`(() => {
   const inputs = [...document.querySelectorAll('input[type="number"].time')]
@@ -347,7 +347,7 @@ check('기본 소리로 샘플 소리를 지정할 수 있다', defaultChipText.
 await sleep(800) // 자동 저장 대기
 
 // 실행
-await click('이 프로젝트 실행')
+await click('이 타이머 실행')
 await waitFor(async () => (await text()).includes('타이머 시작'), '실행 전 화면')
 await click('▶ 타이머 시작', { userGesture: true })
 await waitFor(async () => (await text()).includes('일시 중지'), '실행 중 화면', 12000)
@@ -385,7 +385,7 @@ check(
   audioState.keepAlivePaused === false,
   JSON.stringify(audioState),
 )
-check('Media Session 제목이 프로젝트 이름이다', audioState.metadata === 'E2E 테스트', String(audioState.metadata))
+check('Media Session 제목이 타이머 이름이다', audioState.metadata === 'E2E 테스트', String(audioState.metadata))
 
 await waitFor(async () => (await text()).includes('재생됨'), '첫 소리 재생 완료 표시', 8000)
 check('소리가 재생되면 재생됨으로 표시된다', (await text()).includes('재생됨'))
@@ -431,9 +431,9 @@ const clickNav = async (which) => {
 
 // 소리 보관함 (목록으로 이동 후 하단 탭)
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 목록으로 복귀')
 await clickNav(1)
-await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+await waitFor(async () => (await text()).includes('앱에 포함된 샘플 소리'), '소리 화면')
 const libraryText = await text()
 check('앱에 포함된 샘플 소리(싱잉볼)가 표시된다', libraryText.includes('싱잉볼'))
 check('샘플 소리 길이(0:30)가 표시된다', libraryText.includes('0:30'))
@@ -477,9 +477,9 @@ check('소리가 아닌 파일은 안내와 함께 추가되지 않는다', (awa
 // 저장(IndexedDB) 확인
 await send('Page.reload')
 await sleep(2000)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '새로고침 후 목록')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '새로고침 후 목록')
 await clickNav(1)
-await waitFor(async () => (await text()).includes('소리 보관함'), '새로고침 후 소리 보관함')
+await waitFor(async () => (await text()).includes('앱에 포함된 샘플 소리'), '새로고침 후 소리 화면')
 await waitFor(async () => (await text()).includes('tone-test'), '새로고침 후 파일 유지')
 check('새로고침해도 추가한 파일이 남아 있다', (await text()).includes('tone-test'))
 
@@ -496,7 +496,7 @@ const clickAria = async (label) => {
 }
 
 await clickNav(0)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 목록')
 await click('E2E 테스트')
 await waitFor(
   async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
@@ -519,7 +519,7 @@ check('큐에 사용자 소리를 지정할 수 있다', (await text()).includes
 // 시간대별로 다른 소리를 쓰는지 실제 예약 결과로 확인한다(샘플 약 30초 + 사용자 0.5초)
 await installSchedulerProbe()
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '목록으로 복귀')
 const startedOverrideRun = await evaluate(
   `(() => {
     const card = [...document.querySelectorAll('article.card')].find((el) => el.textContent.includes('E2E 테스트'))
@@ -545,9 +545,9 @@ check(
 await click('■ 종료')
 await sleep(400)
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '목록으로 복귀')
 await clickNav(1)
-await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+await waitFor(async () => (await text()).includes('앱에 포함된 샘플 소리'), '소리 화면')
 await clickAria('삭제')
 await sleep(200)
 await clickAria('삭제')
@@ -565,7 +565,7 @@ await waitFor(async () => (await text()).includes('내 소리 0개'), '소리 �
 check('추가한 소리를 삭제할 수 있다', (await text()).includes('내 소리 0개'))
 
 await clickNav(0)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 목록')
 await click('E2E 테스트')
 await waitFor(
   async () => (await evaluate(`document.querySelectorAll('input[type="number"].time').length`)) >= 2,
@@ -576,7 +576,7 @@ check(
   (await text()).includes('기본 소리 ('),
 )
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '목록으로 복귀')
 
 // 예전 버전에서 저장된 프로젝트(builtin:*)도 샘플 소리로 자동 이전되는지 확인한다
 const legacySeeded = await evaluate(`(async () => {
@@ -610,7 +610,7 @@ check('레거시 프로젝트를 저장할 수 있다', legacySeeded === 'OK', l
 
 await send('Page.reload')
 await sleep(2200)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '새로고침 후 목록')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '새로고침 후 목록')
 check('레거시 프로젝트가 목록에 나타난다', (await text()).includes('레거시 프로젝트'))
 
 await installSchedulerProbe()
@@ -639,11 +639,11 @@ check(
 await click('■ 종료')
 await sleep(300)
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '목록으로 복귀')
 
 // 중단된 실행 복구: 실행 중 새로고침하면 이어서 재생할 수 있어야 한다
 await clickNav(0)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프로젝트 목록')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 목록')
 const startedSecondRun = await evaluate(
   `(() => {
     const card = [...document.querySelectorAll('article.card')].find((el) => el.textContent.includes('E2E 테스트'))
@@ -688,22 +688,37 @@ const persistedTimes = await evaluate(
 )
 check('시간 설정도 유지된다', persistedTimes.startsWith('0:2'), persistedTimes)
 
-// 앱 정보 카드(업데이트 확인/새로고침 경로)
+// 소리 화면(하단 탭) + 헤더 ⓘ 로 여는 앱 정보 화면
 await click('‹')
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '목록으로 복귀')
 await clickNav(1)
-await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+await waitFor(async () => (await text()).includes('앱에 포함된 샘플 소리'), '소리 화면')
+await sleep(300)
+check(
+  '소리 화면의 페이지 제목이 [소리]로 표시된다',
+  (await evaluate(`document.querySelector('.page-name')?.textContent.trim() ?? ''`)) === '소리',
+)
+check(
+  '헤더에 앱 이름(Singing Bowl)이 항상 보인다',
+  (await evaluate(`document.querySelector('.app-name')?.textContent.trim() ?? ''`)) === 'Singing Bowl',
+)
+
+await clickAria('앱 정보')
+await waitFor(async () => (await text()).includes('빌드 시각'), '앱 정보 화면', 10000)
 const appInfoText = await text()
-check('앱 정보 카드에 빌드 시각이 표시된다', appInfoText.includes('빌드 시각'), '')
+check(
+  '앱 정보 화면의 페이지 제목이 [앱 정보]로 표시된다',
+  (await evaluate(`document.querySelector('.page-name')?.textContent.trim() ?? ''`)) === '앱 정보',
+)
+check('앱 정보 화면에 소개가 있다', appInfoText.includes('정해진 시간에 소리를 재생하는 타이머'))
+check('앱 정보 화면에 사용법이 있다', appInfoText.includes('사용법'))
+check('앱 정보 화면에 빌드 시각이 표시된다', appInfoText.includes('빌드 시각'))
 check('업데이트 확인 버튼이 있다', appInfoText.includes('업데이트 확인'))
 check('앱 새로고침 버튼이 있다', appInfoText.includes('앱 새로고침'))
 check(
-  '앱 정보 카드가 소리 보관함 상단에 있다(스크롤 없이 보임)',
-  appInfoText.indexOf('앱 정보') < appInfoText.indexOf('내 소리'),
-  `앱 정보 위치 ${appInfoText.indexOf('앱 정보')}, 내 소리 위치 ${appInfoText.indexOf('내 소리')}`,
+  '앱 정보 화면에 크레딧(샘플 음원 출처)이 있다',
+  appInfoText.includes('크레딧') && appInfoText.includes('BigSoundBank'),
 )
-
-// 데이터 저장(영구 저장) 카드
 check(
   '데이터 저장 카드에 상태 배지가 있다(영구/일반)',
   appInfoText.includes('영구 저장 사용 중') || appInfoText.includes('일반 저장'),
@@ -723,6 +738,10 @@ if (hasPersistButton) {
   )
 }
 
+await click('‹ 타이머로 돌아가기')
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '타이머 화면 복귀')
+check('앱 정보에서 뒤로 가기로 타이머 화면에 돌아온다', (await text()).includes('＋ 새 타이머'))
+
 // --------------------------- 오프라인 동작 검증 ---------------------------
 await send('Network.enable')
 offlinePhase.value = true
@@ -734,8 +753,8 @@ await send('Network.emulateNetworkConditions', {
 })
 await send('Page.reload')
 await sleep(2500)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '오프라인에서 앱 실행', 15000)
-check('오프라인이어도 앱이 실행된다(프리캐시)', (await text()).includes('＋ 새 프로젝트'))
+await waitFor(async () => (await text()).includes('＋ 새 타이머'), '오프라인에서 앱 실행', 15000)
+check('오프라인이어도 앱이 실행된다(프리캐시)', (await text()).includes('＋ 새 타이머'))
 
 await clickNav(1)
 await waitFor(async () => (await text()).includes('싱잉볼'), '오프라인에서 샘플 소리 목록', 10000)
@@ -766,8 +785,8 @@ offlinePhase.value = false
 // 실제로는 새 버전을 배포해야 재현되므로, version.json 응답을 가로채 '새 버전' 을 흉내 낸다.
 await send('Fetch.enable', { patterns: [{ urlPattern: '*version.json*' }] })
 fakeBuildTime = FAKE_BUILD_TIME
-await clickNav(1)
-await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함 화면', 10000)
+await clickAria('앱 정보')
+await waitFor(async () => (await text()).includes('빌드 시각'), '앱 정보 화면', 10000)
 await waitFor(
   async () =>
     await evaluate(`(() => {
@@ -797,8 +816,8 @@ await click('지금 새로고침', { userGesture: true })
 await sleep(2500)
 const reloaded = await evaluate(`typeof window.__probeInstalled === 'undefined'`)
 check('지금 새로고침을 누르면 앱이 다시 로드된다', reloaded === true, `reloaded=${reloaded}`)
-await waitFor(async () => (await text()).includes('＋ 새 프로젝트') || (await text()).includes('소리 보관함'), '새로고침 후 화면', 15000)
-check('새로고침 후에도 앱이 정상 실행된다', (await text()).includes('새 프로젝트') || (await text()).includes('소리'))
+await waitFor(async () => (await text()).includes('＋ 새 타이머') || (await text()).includes('앱에 포함된 샘플 소리'), '새로고침 후 화면', 15000)
+check('새로고침 후에도 앱이 정상 실행된다', (await text()).includes('새 타이머') || (await text()).includes('소리'))
 
 // 가로채기를 끄고 정상 상태로 돌린다.
 fakeBuildTime = null

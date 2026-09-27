@@ -8,15 +8,16 @@
     dismissUpdate,
     registerAppUpdater,
   } from './lib/app-update.svelte.js'
-  import { formatDuration, formatIsoDateTime } from './lib/time.js'
+  import { formatDuration } from './lib/time.js'
   import ProjectList from './components/ProjectList.svelte'
   import ProjectEditor from './components/ProjectEditor.svelte'
   import Runner from './components/Runner.svelte'
   import SoundLibrary from './components/SoundLibrary.svelte'
+  import AppInfo from './components/AppInfo.svelte'
 
   const HINT_KEY = 'singing-bowl:install-hint'
 
-  let view = $state('projects') // projects | editor | runner | sounds
+  let view = $state('timers') // timers | editor | runner | sounds | info
   let activeProjectId = $state(null)
   let pendingRun = $state(null)
   let installHintVisible = $state(false)
@@ -45,6 +46,7 @@
   })
 
   const activeProject = $derived(activeProjectId ? store.projectById(activeProjectId) : null)
+  const isSubPage = $derived(view === 'editor' || view === 'runner' || view === 'info')
 
   function openEditor(projectId) {
     activeProjectId = projectId
@@ -58,12 +60,22 @@
 
   function goBack() {
     if (view === 'runner' && !timer.isActive) timer.reset()
-    view = 'projects'
+    view = 'timers'
     activeProjectId = null
   }
 
   function openSounds() {
     view = 'sounds'
+    activeProjectId = null
+  }
+
+  function openTimers() {
+    view = 'timers'
+    activeProjectId = null
+  }
+
+  function openInfo() {
+    view = 'info'
     activeProjectId = null
   }
 
@@ -101,42 +113,43 @@
     await applyUpdate()
   }
 
-  function headerTitle() {
-    if (view === 'editor') return '프로젝트 편집'
+  /** 헤더에 표시할 현재 화면 이름 */
+  function pageName() {
+    if (view === 'editor') return '타이머 편집'
     if (view === 'runner') return activeProject?.name ?? '타이머'
-    if (view === 'sounds') return '소리 보관함'
-    return 'Singing Bowl'
+    if (view === 'sounds') return '소리'
+    if (view === 'info') return '앱 정보'
+    return '타이머'
   }
 </script>
 
 <div class="app-shell">
   <header class="app-header">
-    {#if view === 'editor' || view === 'runner'}
+    {#if isSubPage}
       <button class="btn-icon plain" aria-label="뒤로" onclick={goBack}>‹</button>
     {/if}
+
     <div class="grow">
-      <div class="title truncate">{headerTitle()}</div>
-      {#if view === 'projects'}
-        <div class="subtitle">정해진 시간에 소리를 재생하는 타이머</div>
-      {:else if view === 'runner' && activeProject}
-        <div class="subtitle truncate">
-          {activeProject.cues.length}개 소리 · 기본 {store.soundName(activeProject.defaultSoundId)}
-        </div>
-      {:else if view === 'sounds'}
-        <div class="subtitle truncate">
-          오프라인 · 이 폰에만 저장 · 빌드 {formatIsoDateTime(appUpdate.buildTime)}
-        </div>
-      {/if}
+      <div class="app-name">Singing Bowl</div>
+      <div class="page-name truncate">{pageName()}</div>
     </div>
 
     {#if timer.isActive && view !== 'runner'}
-      <button class="chip" onclick={() => openRunner(timer.projectId)}>
+      <button
+        class="chip"
+        aria-label="실행 중인 타이머 열기"
+        onclick={() => openRunner(timer.projectId)}
+      >
         {timer.status === 'paused' ? '⏸' : '●'} <span class="tabular">{formatDuration(timer.elapsedMs)}</span>
       </button>
     {/if}
 
     {#if view === 'runner' && activeProject}
       <button class="btn-icon plain" aria-label="편집" onclick={() => openEditor(activeProject.id)}>✎</button>
+    {/if}
+
+    {#if view !== 'info'}
+      <button class="btn-icon plain" aria-label="앱 정보" onclick={openInfo}>ⓘ</button>
     {/if}
   </header>
 
@@ -170,7 +183,7 @@
           <div class="grow">
             <strong>중단되었던 타이머가 있습니다</strong>
             <div class="small muted">
-              {pendingRun.projectName || '프로젝트'} · {formatDuration(pendingRun.elapsedMs)} 지점
+              {pendingRun.projectName || '타이머'} · {formatDuration(pendingRun.elapsedMs)} 지점
             </div>
             <div class="row" style="margin-top:8px">
               <button class="btn primary" onclick={resumeInterruptedRun}>이어서 재생</button>
@@ -180,7 +193,7 @@
         </div>
       {/if}
 
-      {#if installHintVisible && !hintDismissed && view === 'projects'}
+      {#if installHintVisible && !hintDismissed && view === 'timers'}
         <div class="notice">
           <span>📲</span>
           <div class="grow">
@@ -203,7 +216,7 @@
         </div>
       {/if}
 
-      {#if view === 'projects'}
+      {#if view === 'timers'}
         <ProjectList onedit={openEditor} onrun={openRunner} />
       {:else if view === 'editor' && activeProjectId}
         {#key activeProjectId}
@@ -215,14 +228,16 @@
         {/key}
       {:else if view === 'sounds'}
         <SoundLibrary />
+      {:else if view === 'info'}
+        <AppInfo onback={goBack} />
       {/if}
     {/if}
   </main>
 
-  {#if view === 'projects' || view === 'sounds'}
+  {#if view === 'timers' || view === 'sounds'}
     <nav class="bottom-nav">
-      <button class={view === 'projects' ? 'active' : ''} onclick={goBack}>
-        <span class="icon">🕉</span>프로젝트
+      <button class={view === 'timers' ? 'active' : ''} onclick={openTimers}>
+        <span class="icon">🕉</span>타이머
       </button>
       <button class={view === 'sounds' ? 'active' : ''} onclick={openSounds}>
         <span class="icon">🔔</span>소리

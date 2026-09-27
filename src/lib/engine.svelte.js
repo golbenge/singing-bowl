@@ -119,7 +119,7 @@ export class TimerEngine {
     this.projectId = null
 
     if (!project) {
-      this.error = '프로젝트를 찾을 수 없습니다.'
+      this.error = '타이머를 찾을 수 없습니다.'
       return false
     }
 
@@ -136,7 +136,7 @@ export class TimerEngine {
       }))
 
     if (!cues.length) {
-      this.error = '재생할 시간이 없습니다. 프로젝트에 시간을 먼저 추가해 주세요.'
+      this.error = '재생할 시간이 없습니다. 타이머에 시간을 먼저 추가해 주세요.'
       return false
     }
     if (cues.some((cue) => !cue.soundId)) {
