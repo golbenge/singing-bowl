@@ -87,10 +87,6 @@
     </div>
   {/each}
 </div>
-<div class="tiny muted">
-  이 샘플은 CC0(퍼블릭 도메인)이라 자유롭게 사용할 수 있습니다. 다른 음원으로 바꾸려면 저장소의
-  <code>public/sounds/singing-bowl.m4a</code> 를 교체하면 됩니다.
-</div>
 
 <div class="row-between" style="margin-top:6px">
   <div class="section-title">내 소리 {store.sounds.length}개</div>
