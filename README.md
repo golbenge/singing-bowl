@@ -75,13 +75,35 @@ npm run e2e              # 필요하면 CHROME_PATH=/경로/Chrome npm run e2e
 
 ## GitHub Pages 배포
 
-1. 저장소 **Settings → Pages → Build and deployment → Source** 를 **GitHub Actions** 로 설정합니다.
-2. `main` 브랜치에 푸시하면 `.github/workflows/deploy.yml` 이 빌드 후 Pages 에 배포합니다.
+이 저장소는 이미 다음 상태로 설정되어 있습니다.
+
+- 저장소 공개 범위: **Public** (`https://github.com/golbenge/singing-bowl`)
+- Pages: **활성화됨** — Settings → Pages → Source = **GitHub Actions** (`build_type: workflow`)
+- 배포 주소: **https://golbenge.github.io/singing-bowl/**
+
+`main` 브랜치에 푸시하면 `.github/workflows/deploy.yml` 이 `npm ci` → `npm run build` →
+Pages 업로드/배포까지 자동으로 수행합니다. 진행 상황은 저장소의 **Actions** 탭이나 아래 명령으로 봅니다.
+
+```bash
+gh run list --limit 5
+gh run watch               # 진행 상황 실시간 확인
+```
+
+### 처음부터 다시 설정할 때
+
+1. 저장소를 **Public** 으로 둡니다(GitHub Free 는 **public 저장소에서만 Pages 사용 가능**하며,
+   private 저장소에서 쓰려면 GitHub Pro/Team/Enterprise 가 필요합니다 —
+   [문서](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)).
+2. **Settings → Pages → Build and deployment → Source** 를 **GitHub Actions** 로 선택합니다.
+   (`actions/configure-pages` 가 배포 시 자동으로 설정하기도 합니다.)
 3. 저장소 이름이 `singing-bowl` 이 아니면 빌드할 때 기준 경로를 바꿉니다.
 
 ```bash
 BASE_PATH=/my-repo/ npm run build
 ```
+
+> 저장소를 public 으로 두어도 **사용자의 음향 파일과 프로젝트 데이터는 저장소에 올라가지 않습니다.**
+> 그것들은 각 기기의 IndexedDB 에만 저장되고, 저장소에는 소스 코드만 있습니다.
 
 ## 데이터 저장 위치
 
