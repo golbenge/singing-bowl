@@ -2,6 +2,12 @@
   import { onMount } from 'svelte'
   import { store } from './lib/store.svelte.js'
   import { discardPersistedRun, readPersistedRun, timer } from './lib/engine.svelte.js'
+  import {
+    appUpdate,
+    applyUpdate,
+    dismissUpdate,
+    registerAppUpdater,
+  } from './lib/app-update.svelte.js'
   import { formatDuration } from './lib/time.js'
   import ProjectList from './components/ProjectList.svelte'
   import ProjectEditor from './components/ProjectEditor.svelte'
@@ -18,6 +24,7 @@
   let booting = $state(true)
 
   onMount(async () => {
+    registerAppUpdater()
     await store.init()
 
     const saved = readPersistedRun()
@@ -88,6 +95,12 @@
     timer.reset()
   }
 
+  /** 새로고침 직전에 실행 중이던 타이머를 일시 중지해 두면, 새 버전에서 '이어서 재생'할 수 있다. */
+  async function handleApplyUpdate() {
+    if (timer.status === 'running') timer.pause()
+    await applyUpdate()
+  }
+
   function headerTitle() {
     if (view === 'editor') return '프로젝트 편집'
     if (view === 'runner') return activeProject?.name ?? '타이머'
@@ -132,6 +145,23 @@
         <span class="muted small">데이터를 불러오는 중…</span>
       </div>
     {:else}
+      {#if appUpdate.needRefresh}
+        <div class="notice accent">
+          <span>✨</span>
+          <div class="grow">
+            <strong>새 버전이 있습니다</strong>
+            <div class="tiny muted">
+              새로고침하면 최신 기능이 적용됩니다.
+              {#if timer.isActive}실행 중인 타이머는 일시 중지되고, 새로고침 후 ‘이어서 재생’할 수 있습니다.{/if}
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn primary" onclick={handleApplyUpdate}>지금 새로고침</button>
+              <button class="btn ghost" onclick={dismissUpdate}>나중에</button>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       {#if pendingRun && view !== 'runner'}
         <div class="notice accent">
           <span>⏱</span>

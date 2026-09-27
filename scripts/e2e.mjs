@@ -57,6 +57,11 @@ let messageId = 0
 const pending = new Map()
 const consoleErrors = []
 
+// 가짜 새 버전 응답(업데이트 안내 테스트용)
+let fakeBuildTime = null
+const FAKE_BUILD_TIME = '2099-01-01T00:00:00.000Z'
+const offlinePhase = { value: false }
+
 socket.addEventListener('message', (event) => {
   const message = JSON.parse(event.data)
   if (message.id && pending.has(message.id)) {
@@ -64,6 +69,23 @@ socket.addEventListener('message', (event) => {
     pending.delete(message.id)
     if (message.error) reject(new Error(JSON.stringify(message.error)))
     else resolve(message.result)
+    return
+  }
+  if (message.method === 'Fetch.requestPaused') {
+    const { requestId, request } = message.params
+    if (fakeBuildTime && request.url.includes('version.json')) {
+      send('Fetch.fulfillRequest', {
+        requestId,
+        responseCode: 200,
+        responseHeaders: [
+          { name: 'content-type', value: 'application/json' },
+          { name: 'cache-control', value: 'no-store' },
+        ],
+        body: Buffer.from(JSON.stringify({ buildTime: fakeBuildTime })).toString('base64'),
+      }).catch(() => {})
+    } else {
+      send('Fetch.continueRequest', { requestId }).catch(() => {})
+    }
     return
   }
   if (message.method === 'Runtime.exceptionThrown') {
@@ -78,7 +100,10 @@ socket.addEventListener('message', (event) => {
     console.log(`[browser] ${line.split('\n')[0]}`)
   }
   if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') {
-    const line = `log: ${message.params.entry.text}`
+    const text = message.params.entry.text
+    // 오프라인 테스트 중 발생하는 네트워크 오류는 예상된 것이라 무시한다.
+    if (offlinePhase.value && /ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED/.test(text)) return
+    const line = `log: ${text}`
     consoleErrors.push(line)
     console.log(`[browser] ${line.split('\n')[0]}`)
   }
@@ -211,6 +236,12 @@ const uploadFile = (fileExpression) =>
   return 'OK'
 })()`)
 
+/** 업데이트 안내 배너가 화면에 있는지(배너 전용 버튼으로 판별) */
+const updateBannerVisible = () =>
+  evaluate(
+    `[...document.querySelectorAll('button')].some((el) => el.textContent.includes('지금 새로고침'))`,
+  )
+
 /* --------------------------------- 테스트 --------------------------------- */
 
 await send('Runtime.enable')
@@ -221,6 +252,19 @@ await sleep(1800)
 
 await waitFor(async () => (await text()).includes('아침 명상'), '첫 화면 렌더링')
 check('앱이 처음 실행되면 예시 프로젝트가 보인다', (await text()).includes('아침 명상'))
+
+// 서비스 워커 등록(오프라인 동작의 전제)
+const swRegistered = await evaluate(
+  `navigator.serviceWorker.getRegistrations().then((list) => list.length)`,
+)
+check('서비스 워커가 등록된다', swRegistered >= 1, `등록 수 ${swRegistered}`)
+await waitFor(
+  async () => await evaluate(`!!navigator.serviceWorker.controller`),
+  '서비스 워커가 페이지를 제어',
+  20000,
+)
+check('서비스 워커가 페이지를 제어한다', await evaluate(`!!navigator.serviceWorker.controller`))
+check('업데이트 안내는 최신 버전에서는 보이지 않는다', !(await updateBannerVisible()))
 
 // 소리 스케줄링 검증용 계측 (새로고침 후에도 다시 설치한다)
 const installSchedulerProbe = () =>
@@ -643,6 +687,97 @@ const persistedTimes = await evaluate(
   `[...document.querySelectorAll('input[type="number"].time')].map((input) => input.value).join(':')`,
 )
 check('시간 설정도 유지된다', persistedTimes.startsWith('0:2'), persistedTimes)
+
+// 앱 정보 카드(업데이트 확인/새로고침 경로)
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+await clickNav(1)
+await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
+const appInfoText = await text()
+check('앱 정보 카드에 빌드 시각이 표시된다', appInfoText.includes('빌드 시각'), '')
+check('업데이트 확인 버튼이 있다', appInfoText.includes('업데이트 확인'))
+check('앱 새로고침 버튼이 있다', appInfoText.includes('앱 새로고침'))
+
+// --------------------------- 오프라인 동작 검증 ---------------------------
+await send('Network.enable')
+offlinePhase.value = true
+await send('Network.emulateNetworkConditions', {
+  offline: true,
+  latency: 0,
+  downloadThroughput: 0,
+  uploadThroughput: 0,
+})
+await send('Page.reload')
+await sleep(2500)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '오프라인에서 앱 실행', 15000)
+check('오프라인이어도 앱이 실행된다(프리캐시)', (await text()).includes('＋ 새 프로젝트'))
+
+await clickNav(1)
+await waitFor(async () => (await text()).includes('싱잉볼'), '오프라인에서 샘플 소리 목록', 10000)
+check('오프라인에서도 샘플 소리 목록이 보인다', (await text()).includes('싱잉볼'))
+
+const offlinePreview = await evaluate(`(() => {
+  const button = document.querySelector('button[aria-label="미리 듣기"]')
+  if (!button) return 'NO_BUTTON'
+  button.click()
+  return 'OK'
+})()`)
+check('오프라인에서 샘플 소리 미리 듣기를 누를 수 있다', offlinePreview === 'OK', offlinePreview)
+await sleep(2000)
+check(
+  '오프라인에서도 샘플 음원이 로딩된다(캐시)',
+  !(await text()).includes('불러오지 못했습니다'),
+)
+
+await send('Network.emulateNetworkConditions', {
+  offline: false,
+  latency: 0,
+  downloadThroughput: -1,
+  uploadThroughput: -1,
+})
+offlinePhase.value = false
+
+// ---------------------- 업데이트 안내 / 새로고침 검증 ----------------------
+// 실제로는 새 버전을 배포해야 재현되므로, version.json 응답을 가로채 '새 버전' 을 흉내 낸다.
+await send('Fetch.enable', { patterns: [{ urlPattern: '*version.json*' }] })
+fakeBuildTime = FAKE_BUILD_TIME
+await clickNav(1)
+await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함 화면', 10000)
+await waitFor(
+  async () =>
+    await evaluate(`(() => {
+      const button = [...document.querySelectorAll('button')].find((el) =>
+        el.textContent.includes('업데이트 확인'),
+      )
+      return !!button && !button.disabled
+    })()`),
+  '업데이트 확인 버튼 활성화',
+  15000,
+)
+await click('업데이트 확인')
+await waitFor(updateBannerVisible, '업데이트 안내 표시', 12000)
+check('새 버전 감지 시 안내가 표시된다', await updateBannerVisible())
+check('안내에 지금 새로고침 버튼이 있다', (await text()).includes('지금 새로고침'))
+
+await click('나중에')
+await sleep(400)
+check('나중에를 누르면 안내가 사라진다', !(await updateBannerVisible()))
+
+await click('업데이트 확인')
+await waitFor(updateBannerVisible, '다시 안내', 12000)
+check('업데이트 확인을 다시 누르면 안내가 돌아온다', await updateBannerVisible())
+
+// 새로고침 동작 확인: 리로드되면 주입해 둔 계측(window.__probeInstalled)이 사라진다.
+await click('지금 새로고침', { userGesture: true })
+await sleep(2500)
+const reloaded = await evaluate(`typeof window.__probeInstalled === 'undefined'`)
+check('지금 새로고침을 누르면 앱이 다시 로드된다', reloaded === true, `reloaded=${reloaded}`)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트') || (await text()).includes('소리 보관함'), '새로고침 후 화면', 15000)
+check('새로고침 후에도 앱이 정상 실행된다', (await text()).includes('새 프로젝트') || (await text()).includes('소리'))
+
+// 가로채기를 끄고 정상 상태로 돌린다.
+fakeBuildTime = null
+await send('Fetch.disable')
 
 /* --------------------------------- 결과 ---------------------------------- */
 

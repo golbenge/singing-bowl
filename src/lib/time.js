@@ -61,6 +61,19 @@ export function formatBytes(bytes) {
   return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)}${units[unit]}`
 }
 
+/** Date.now() 값 -> "2026. 9. 27. 16:05" (빌드 시각 표시용) */
+export function formatDateTime(timestamp) {
+  const date = new Date(timestamp)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}. ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** ISO 문자열을 같은 형식으로 */
+export function formatIsoDateTime(iso) {
+  const timestamp = Date.parse(iso)
+  return Number.isNaN(timestamp) ? '-' : formatDateTime(timestamp)
+}
+
 /** 소리 파일 이름에서 확장자를 떼어낸다. */
 export function stripExtension(fileName) {
   return fileName.replace(/\.[a-z0-9]{1,5}$/i, '')
