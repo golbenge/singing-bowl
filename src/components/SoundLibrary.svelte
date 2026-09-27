@@ -1,8 +1,8 @@
 <script>
-  /** 소리 보관함: 내장 소리 + 사용자가 추가한 음향 파일 */
+  /** 소리 보관함: 앱 샘플 소리 + 사용자가 추가한 음향 파일 */
   import { onMount } from 'svelte'
   import { store } from '../lib/store.svelte.js'
-  import { BUILTIN_SOUNDS } from '../lib/synth.js'
+  import { BUNDLED_SOUNDS } from '../lib/bundled-sounds.js'
   import { previewSound } from '../lib/audio-session.js'
   import { formatBytes, formatDuration } from '../lib/time.js'
 
@@ -89,9 +89,9 @@
   </span>
 </div>
 
-<div class="section-title">내장 소리 (합성 · 파일 없이 사용 가능)</div>
+<div class="section-title">앱에 포함된 샘플 소리 (오프라인에서도 재생)</div>
 <div class="list">
-  {#each BUILTIN_SOUNDS as sound (sound.id)}
+  {#each BUNDLED_SOUNDS as sound (sound.id)}
     <div class="list-item">
       <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
         {previewingId === sound.id ? '♪' : '▶'}
@@ -99,10 +99,15 @@
       <div class="grow">
         <div class="card-title">{sound.name}</div>
         <div class="card-sub">{sound.description}</div>
+        {#if sound.license}<div class="tiny muted">{sound.license}</div>{/if}
       </div>
       <span class="badge tabular">{formatDuration(sound.durationMs)}</span>
     </div>
   {/each}
+</div>
+<div class="tiny muted">
+  이 샘플은 CC0(퍼블릭 도메인)이라 자유롭게 사용할 수 있습니다. 다른 음원으로 바꾸려면 저장소의
+  <code>public/sounds/singing-bowl.m4a</code> 를 교체하면 됩니다.
 </div>
 
 <div class="row-between" style="margin-top:6px">

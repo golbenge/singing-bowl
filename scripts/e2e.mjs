@@ -176,22 +176,28 @@ await sleep(1800)
 await waitFor(async () => (await text()).includes('아침 명상'), '첫 화면 렌더링')
 check('앱이 처음 실행되면 예시 프로젝트가 보인다', (await text()).includes('아침 명상'))
 
-// 소리 스케줄링 검증용 계측
-await evaluate(`(() => {
+// 소리 스케줄링 검증용 계측 (새로고침 후에도 다시 설치한다)
+const installSchedulerProbe = () =>
+  evaluate(`(() => {
   window.__scheduled = []
-  const nativeStart = AudioBufferSourceNode.prototype.start
-  AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
-    try {
-      window.__scheduled.push({
-        when,
-        now: this.context.currentTime,
-        duration: this.buffer ? this.buffer.duration : 0,
-      })
-    } catch {}
-    return nativeStart.call(this, when, offset, duration)
+  if (!window.__probeInstalled) {
+    const nativeStart = AudioBufferSourceNode.prototype.start
+    AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
+      try {
+        window.__scheduled.push({
+          when,
+          now: this.context.currentTime,
+          duration: this.buffer ? this.buffer.duration : 0,
+        })
+      } catch {}
+      return nativeStart.call(this, when, offset, duration)
+    }
+    window.__probeInstalled = true
   }
   return true
 })()`)
+
+await installSchedulerProbe()
 
 // 새 프로젝트 생성 → 0:02 / 5:02 두 개의 시간
 await click('＋ 새 프로젝트')
@@ -228,7 +234,7 @@ await click('＋5분')
 await sleep(400)
 check('두 번째 시간이 5:02 로 추가된다', (await text()).includes('5:02'))
 
-// 프로젝트 기본 소리 바꾸기(모든 시간대에 같은 소리 사용)
+// 기본 소리 시트에서 앱에 포함된 샘플 소리를 확인한다
 const openedDefaultPicker = await evaluate(`(() => {
   const chip = document.querySelector('article.card button.chip')
   if (!chip) return 'NO_CHIP'
@@ -237,12 +243,14 @@ const openedDefaultPicker = await evaluate(`(() => {
 })()`)
 check('기본 소리 버튼을 누를 수 있다', openedDefaultPicker === 'OK', openedDefaultPicker)
 await waitFor(async () => (await text()).includes('기본 소리 선택'), '기본 소리 시트')
-await click('징')
+const defaultSheetText = await text()
+check('기본 소리 시트에 샘플 소리(싱잉볼)가 있다', defaultSheetText.includes('싱잉볼'), '')
+await click('싱잉볼')
 await sleep(400)
 const defaultChipText = await evaluate(
   `document.querySelector('article.card button.chip')?.textContent.trim() ?? ''`,
 )
-check('기본 소리를 징으로 바꿀 수 있다', defaultChipText.includes('징'), defaultChipText)
+check('기본 소리로 샘플 소리를 지정할 수 있다', defaultChipText.includes('싱잉볼'), defaultChipText)
 
 await sleep(800) // 자동 저장 대기
 
@@ -256,9 +264,9 @@ check('시작하면 실행 화면으로 바뀐다', (await text()).includes('일
 await sleep(2000)
 const scheduled = await evaluate('window.__scheduled')
 check(
-  '기본 소리(징)가 모든 시간대에 적용된다',
-  scheduled.length >= 2 && scheduled.every((entry) => entry.duration > 12),
-  JSON.stringify(scheduled.map((entry) => entry.duration)),
+  '샘플 소리(약 30초)가 모든 시간대에 적용된다',
+  scheduled.length >= 2 && scheduled.every((entry) => entry.duration > 25),
+  JSON.stringify(scheduled.map((entry) => Number(entry.duration.toFixed(1)))),
 )
 const near2 = scheduled.find((entry) => Math.abs(entry.when - entry.now - 2) < 0.5)
 const near302 = scheduled.find((entry) => Math.abs(entry.when - entry.now - 302) < 1.5)
@@ -335,10 +343,9 @@ await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '프�
 await clickNav(1)
 await waitFor(async () => (await text()).includes('소리 보관함'), '소리 보관함')
 const libraryText = await text()
-check(
-  '내장 소리 6종이 표시된다',
-  ['싱잉볼', '큰 종', '징', '방울', '목탁', '알림음'].every((name) => libraryText.includes(name)),
-)
+check('앱에 포함된 샘플 소리(싱잉볼)가 표시된다', libraryText.includes('싱잉볼'))
+check('샘플 소리 길이(0:30)가 표시된다', libraryText.includes('0:30'))
+check('샘플 소리 라이선스(CC0)가 표시된다', libraryText.includes('CC0'))
 
 // 사용자 음향 파일 추가(IndexedDB 저장 + 디코딩 검증)
 const fileResult = await evaluate(`(() => {
@@ -424,6 +431,34 @@ await click('tone-test')
 await sleep(400)
 check('큐에 사용자 소리를 지정할 수 있다', (await text()).includes('tone-test'))
 
+// 시간대별로 다른 소리를 쓰는지 실제 예약 결과로 확인한다(샘플 약 30초 + 사용자 0.5초)
+await installSchedulerProbe()
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+const startedOverrideRun = await evaluate(
+  `(() => {
+    const card = [...document.querySelectorAll('article.card')].find((el) => el.textContent.includes('E2E 테스트'))
+    const button = card?.querySelector('button.btn.play')
+    if (!button) return 'NO_BUTTON'
+    button.click()
+    return 'OK'
+  })()`,
+  { userGesture: true },
+)
+check('시간대별 소리를 확인할 실행을 시작할 수 있다', startedOverrideRun === 'OK', startedOverrideRun)
+await waitFor(async () => (await text()).includes('타이머 시작'), '실행 전 화면')
+await click('▶ 타이머 시작', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '실행 중 화면', 12000)
+await sleep(1200)
+const overrideScheduled = (await evaluate('window.__scheduled')) ?? []
+const overrideDurations = overrideScheduled.map((entry) => Number(entry.duration.toFixed(2)))
+check(
+  '시간대마다 다른 소리가 예약된다(약 30초 + 0.5초)',
+  overrideDurations.includes(0.5) && overrideDurations.some((duration) => duration > 25),
+  JSON.stringify(overrideDurations),
+)
+await click('■ 종료')
+await sleep(400)
 await click('‹')
 await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
 await clickNav(1)
@@ -445,6 +480,69 @@ check(
   '삭제된 소리를 쓰던 큐는 기본 소리로 돌아온다',
   (await text()).includes('기본 소리 ('),
 )
+await click('‹')
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
+
+// 예전 버전에서 저장된 프로젝트(builtin:*)도 샘플 소리로 자동 이전되는지 확인한다
+const legacySeeded = await evaluate(`(async () => {
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open('singing-bowl', 1)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  const legacy = {
+    id: 'project_legacy',
+    name: '레거시 프로젝트',
+    defaultSoundId: 'builtin:bowl',
+    volume: 0.9,
+    cues: [
+      { id: 'cue_legacy_1', atSeconds: 3, soundId: null, label: '' },
+      { id: 'cue_legacy_2', atSeconds: 60, soundId: 'builtin:wood', label: '' },
+    ],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction('projects', 'readwrite')
+    transaction.objectStore('projects').put(legacy)
+    transaction.oncomplete = () => resolve('OK')
+    transaction.onerror = () => reject(transaction.error)
+  })
+  db.close()
+  return 'OK'
+})()`)
+check('레거시 프로젝트를 저장할 수 있다', legacySeeded === 'OK', legacySeeded)
+
+await send('Page.reload')
+await sleep(2200)
+await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '새로고침 후 목록')
+check('레거시 프로젝트가 목록에 나타난다', (await text()).includes('레거시 프로젝트'))
+
+await installSchedulerProbe()
+const startedLegacyRun = await evaluate(
+  `(() => {
+    const card = [...document.querySelectorAll('article.card')].find((el) => el.textContent.includes('레거시 프로젝트'))
+    const button = card?.querySelector('button.btn.play')
+    if (!button) return 'NO_BUTTON'
+    button.click()
+    return 'OK'
+  })()`,
+  { userGesture: true },
+)
+check('레거시 프로젝트를 실행할 수 있다', startedLegacyRun === 'OK', startedLegacyRun)
+await waitFor(async () => (await text()).includes('타이머 시작'), '레거시 실행 전 화면')
+check('레거시 소리 지정이 샘플 소리로 표시된다', (await text()).includes('싱잉볼'))
+await click('▶ 타이머 시작', { userGesture: true })
+await waitFor(async () => (await text()).includes('일시 중지'), '레거시 실행 중 화면', 12000)
+await sleep(1200)
+const legacyScheduled = (await evaluate('window.__scheduled')) ?? []
+check(
+  '레거시 시간대도 샘플 소리로 예약된다',
+  legacyScheduled.length > 0 && legacyScheduled.every((entry) => entry.duration > 25),
+  JSON.stringify(legacyScheduled.map((entry) => Number(entry.duration.toFixed(1)))),
+)
+await click('■ 종료')
+await sleep(300)
 await click('‹')
 await waitFor(async () => (await text()).includes('＋ 새 프로젝트'), '목록으로 복귀')
 

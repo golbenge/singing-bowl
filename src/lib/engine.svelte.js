@@ -25,7 +25,7 @@ import {
   updateMediaSession,
 } from './audio-session.js'
 import { loadBuffer } from './sound-loader.js'
-import { DEFAULT_SOUND_ID } from './synth.js'
+import { DEFAULT_SOUND_ID, normalizeSoundId } from './bundled-sounds.js'
 
 const STORAGE_KEY = 'singing-bowl:active-run'
 const TAIL_MS = 15000 // 마지막 소리 후 이만큼 지나면 자동 종료
@@ -123,15 +123,15 @@ export class TimerEngine {
       return false
     }
 
-    const defaultSoundId = project.defaultSoundId ?? DEFAULT_SOUND_ID
+    const defaultSoundId = normalizeSoundId(project.defaultSoundId) ?? DEFAULT_SOUND_ID
     const cues = [...(project.cues ?? [])]
       .sort((a, b) => a.atSeconds - b.atSeconds)
       .map((cue) => ({
         id: cue.id,
         atSeconds: cue.atSeconds,
-        soundId: cue.soundId ?? defaultSoundId,
+        soundId: normalizeSoundId(cue.soundId) ?? defaultSoundId,
         label: cue.label ?? '',
-        usesDefault: !cue.soundId,
+        usesDefault: !normalizeSoundId(cue.soundId),
         state: 'pending',
       }))
 
@@ -493,7 +493,7 @@ export class TimerEngine {
     this.cues = saved.cues.map((cue) => ({
       id: cue.id,
       atSeconds: cue.atSeconds,
-      soundId: cue.soundId,
+      soundId: normalizeSoundId(cue.soundId) ?? DEFAULT_SOUND_ID,
       label: cue.label ?? '',
       usesDefault: !!cue.usesDefault,
       state: cue.atSeconds * 1000 <= elapsedMs ? 'skipped' : 'pending',

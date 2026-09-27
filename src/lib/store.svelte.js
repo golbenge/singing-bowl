@@ -3,7 +3,7 @@
  * 모든 데이터는 폰 로컬(IndexedDB)에만 저장된다.
  */
 import * as db from './db.js'
-import { DEFAULT_SOUND_ID, BUILTIN_SOUNDS, builtinSound } from './synth.js'
+import { BUNDLED_SOUNDS, DEFAULT_SOUND_ID, bundledSound, normalizeSoundId } from './bundled-sounds.js'
 import { evictBuffer, probeAudio } from './sound-loader.js'
 import { getAudioContext } from './audio-session.js'
 import { stripExtension, uid } from './time.js'
@@ -19,7 +19,7 @@ function normalizeCue(cue) {
   return {
     id: cue?.id ?? uid('cue'),
     atSeconds: Math.max(0, Math.round(cue?.atSeconds ?? 0)),
-    soundId: cue?.soundId ?? null,
+    soundId: normalizeSoundId(cue?.soundId),
     label: cue?.label ?? '',
   }
 }
@@ -29,7 +29,7 @@ function normalizeProject(project) {
   return {
     id: project?.id ?? uid('project'),
     name: project?.name?.trim() || '이름 없는 프로젝트',
-    defaultSoundId: project?.defaultSoundId ?? DEFAULT_SOUND_ID,
+    defaultSoundId: normalizeSoundId(project?.defaultSoundId) ?? DEFAULT_SOUND_ID,
     volume: typeof project?.volume === 'number' ? Math.min(1, Math.max(0, project.volume)) : 0.9,
     cues: Array.isArray(project?.cues)
       ? project.cues
@@ -58,11 +58,11 @@ function createProject(name, { cues, defaultSoundId } = {}) {
 function firstRunProjects() {
   return [
     createProject('아침 명상', {
-      defaultSoundId: 'builtin:bowl',
+      defaultSoundId: DEFAULT_SOUND_ID,
       cues: [
         { atSeconds: 300, soundId: null, label: '' },
         { atSeconds: 600, soundId: null, label: '' },
-        { atSeconds: 900, soundId: 'builtin:wood', label: '마무리' },
+        { atSeconds: 900, soundId: null, label: '마무리' },
       ],
     }),
   ]
@@ -76,9 +76,9 @@ export class AppStore {
   sounds = $state([])
   projects = $state([])
 
-  /** 내장 소리 + 사용자 소리 */
+  /** 앱에 포함된 샘플 소리 + 사용자 소리 */
   get allSounds() {
-    return [...BUILTIN_SOUNDS, ...this.sounds]
+    return [...BUNDLED_SOUNDS, ...this.sounds]
   }
 
   get totalCueCount() {
@@ -90,8 +90,8 @@ export class AppStore {
   }
 
   soundById(soundId) {
-    const preset = builtinSound(soundId)
-    if (preset) return preset
+    const bundled = bundledSound(soundId)
+    if (bundled) return bundled
     return this.sounds.find((sound) => sound.id === soundId) ?? null
   }
 

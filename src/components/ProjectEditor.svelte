@@ -5,7 +5,7 @@
   import { store } from '../lib/store.svelte.js'
   import { timer } from '../lib/engine.svelte.js'
   import { previewSound } from '../lib/audio-session.js'
-  import { DEFAULT_SOUND_ID } from '../lib/synth.js'
+  import { DEFAULT_SOUND_ID } from '../lib/bundled-sounds.js'
   import { clamp, formatDuration, formatKoreanDuration, uid } from '../lib/time.js'
 
   let { projectId, onback, onrun } = $props()

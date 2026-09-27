@@ -1,9 +1,9 @@
 <script>
-  /** 소리 선택 시트: 기본 소리 사용 / 내장 소리 / 내가 추가한 소리 */
+  /** 소리 선택 시트: 기본 소리 사용 / 앱 샘플 소리 / 내가 추가한 소리 */
   import Modal from './Modal.svelte'
   import { store } from '../lib/store.svelte.js'
   import { previewSound } from '../lib/audio-session.js'
-  import { BUILTIN_SOUNDS } from '../lib/synth.js'
+  import { BUNDLED_SOUNDS } from '../lib/bundled-sounds.js'
   import { formatDuration } from '../lib/time.js'
 
   let {
@@ -68,8 +68,8 @@
       <div class="divider"></div>
     {/if}
 
-    <div class="section-title">내장 소리</div>
-    {#each BUILTIN_SOUNDS as sound (sound.id)}
+    <div class="section-title">앱에 포함된 샘플 소리</div>
+    {#each BUNDLED_SOUNDS as sound (sound.id)}
       <div class="list-item {value === sound.id ? 'active' : ''}">
         <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
           {previewingId === sound.id ? '♪' : '▶'}

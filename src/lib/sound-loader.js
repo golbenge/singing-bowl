@@ -1,10 +1,10 @@
 /**
  * 소리 ID -> AudioBuffer 로딩(디코딩) 및 메모리 캐시.
- *  - 'builtin:*' 은 코드로 합성한 내장 소리
+ *  - 'bundled:*' 는 앱에 포함된 샘플 음원 파일(public/sounds/*)
  *  - 그 외 ID 는 IndexedDB에 저장된 사용자 음향 파일(Blob)
  */
 import { SOUNDS, getOne } from './db.js'
-import { isBuiltinSoundId, renderBuiltinBuffer } from './synth.js'
+import { bundledSound, bundledSoundUrl, isBundledSoundId } from './bundled-sounds.js'
 
 const bufferCache = new Map()
 const pending = new Map()
@@ -45,6 +45,21 @@ async function loadFromStorage(context, soundId) {
   return decodeAudioData(context, arrayBuffer)
 }
 
+/** 앱에 포함된 샘플 음원(오프라인 캐시 대상)을 읽어서 디코딩한다. */
+async function loadBundled(context, soundId) {
+  const sound = bundledSound(soundId)
+  if (!sound) throw new Error(`알 수 없는 샘플 소리입니다: ${soundId}`)
+
+  const response = await fetch(bundledSoundUrl(sound))
+  if (!response.ok) {
+    throw new Error(
+      `샘플 소리를 불러오지 못했습니다(${response.status}). 네트워크가 연결된 상태로 한 번 실행해 주세요.`,
+    )
+  }
+  const arrayBuffer = await response.arrayBuffer()
+  return decodeAudioData(context, arrayBuffer)
+}
+
 /** 소리를 재생 가능한 AudioBuffer 로 가져온다(캐시 사용). */
 export async function loadBuffer(context, soundId) {
   if (!soundId) throw new Error('재생할 소리가 지정되지 않았습니다.')
@@ -52,8 +67,8 @@ export async function loadBuffer(context, soundId) {
   if (pending.has(soundId)) return pending.get(soundId)
 
   const task = (async () => {
-    const buffer = isBuiltinSoundId(soundId)
-      ? renderBuiltinBuffer(context, soundId)
+    const buffer = isBundledSoundId(soundId)
+      ? await loadBundled(context, soundId)
       : await loadFromStorage(context, soundId)
     bufferCache.set(soundId, buffer)
     return buffer

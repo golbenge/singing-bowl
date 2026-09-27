@@ -32,7 +32,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // m4a 등 음원 확장자도 함께 미리 받아 두어야 오프라인에서 샘플 소리가 재생된다.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,m4a,mp3,wav,ogg,aac}'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
