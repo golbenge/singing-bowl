@@ -658,4 +658,9 @@ input[type='range'] {
 .danger-text {
   color: var(--danger);
 }
+.accent-text {
+  color: var(--accent);
+}
+
+
 

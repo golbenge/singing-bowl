@@ -214,18 +214,69 @@ export function clearMediaSession() {
 
 /* --------------------------------- 미리 듣기 -------------------------------- */
 
-/** 소리 목록에서 한 번 미리 들어보기(타이머 볼륨과 무관). */
-export async function previewSound(soundId, volume = 0.85) {
+let currentPreviewToken = 0
+let activePreviewSource = null
+let activePreviewGain = null
+let activePreviewEndCallback = null
+
+/** 현재 재생 중인 미리 듣기 소리를 즉시 정지한다. */
+export function stopPreview() {
+  currentPreviewToken += 1
+  const source = activePreviewSource
+  const gain = activePreviewGain
+  const cb = activePreviewEndCallback
+
+  activePreviewSource = null
+  activePreviewGain = null
+  activePreviewEndCallback = null
+
+  if (source) {
+    try {
+      source.onended = null
+      source.stop()
+      source.disconnect()
+    } catch {
+      /* noop */
+    }
+  }
+  if (gain) {
+    try {
+      gain.disconnect()
+    } catch {
+      /* noop */
+    }
+  }
+  if (cb) {
+    try {
+      cb()
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+/** 소리 목록에서 한 번 미리 들어보기(타이머 볼륨과 무관). 재생 완료 시 onended 호출. */
+export async function previewSound(soundId, volume = 0.85, onended = null) {
+  stopPreview()
+  const token = ++currentPreviewToken
   await unlockAudio()
   const context = getAudioContext()
   const buffer = await loadBuffer(context, soundId)
+
+  // 비동기 로딩 중 취소되었거나 다른 소리가 요청된 경우
+  if (token !== currentPreviewToken) return null
+
   const gain = context.createGain()
   gain.gain.value = Math.min(1, Math.max(0, volume))
   gain.connect(context.destination)
   const source = context.createBufferSource()
   source.buffer = buffer
   source.connect(gain)
-  source.start()
+
+  activePreviewSource = source
+  activePreviewGain = gain
+  activePreviewEndCallback = onended
+
   source.onended = () => {
     try {
       source.disconnect()
@@ -233,10 +284,21 @@ export async function previewSound(soundId, volume = 0.85) {
     } catch {
       /* noop */
     }
+    if (activePreviewSource === source) {
+      activePreviewSource = null
+      activePreviewGain = null
+      activePreviewEndCallback = null
+      onended?.()
+    }
   }
+
+  source.start()
   return source
 }
 
+export function isPreviewPlaying() {
+  return activePreviewSource !== null
+}
 
 export function audioContextState() {
   return audioContext?.state ?? 'closed'

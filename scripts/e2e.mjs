@@ -795,7 +795,25 @@ const offlinePreview = await evaluate(`(() => {
   return 'OK'
 })()`)
 check('오프라인에서 샘플 소리 미리 듣기를 누를 수 있다', offlinePreview === 'OK', offlinePreview)
-await sleep(2000)
+await sleep(500)
+
+const stopButtonCheck = await evaluate(`(() => {
+  const stopButton = document.querySelector('button[aria-label="재생 중지"]')
+  if (!stopButton) return 'NO_STOP_BUTTON'
+  stopButton.click()
+  return 'OK'
+})()`)
+check('재생 중에는 재생 중지(■) 버튼으로 바뀌고 클릭 시 정지할 수 있다', stopButtonCheck === 'OK', stopButtonCheck)
+await sleep(300)
+
+const restoredPlayButton = await evaluate(`(() => {
+  const stopButton = document.querySelector('button[aria-label="재생 중지"]')
+  const playButton = document.querySelector('button[aria-label="미리 듣기"]')
+  return !stopButton && !!playButton
+})()`)
+check('재생 중지 후 버튼이 다시 미리 듣기(▶)로 복원된다', restoredPlayButton)
+
+await sleep(1500)
 check(
   '오프라인에서도 샘플 음원이 로딩된다(캐시)',
   !(await text()).includes('불러오지 못했습니다'),

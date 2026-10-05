@@ -2,7 +2,7 @@
   /** 소리 선택 시트: 기본 소리 사용 / 앱 샘플 소리 / 내가 추가한 소리 */
   import Modal from './Modal.svelte'
   import { store } from '../lib/store.svelte.js'
-  import { previewSound } from '../lib/audio-session.js'
+  import { previewSound, stopPreview } from '../lib/audio-session.js'
   import { BUNDLED_SOUNDS, SOUND_SOURCES } from '../lib/bundled-sounds.js'
   import { formatDuration } from '../lib/time.js'
 
@@ -38,17 +38,21 @@
     defaultSoundId ? store.soundName(defaultSoundId) : '기본 소리 없음',
   )
 
-  async function preview(soundId) {
+  async function togglePreview(soundId) {
+    if (previewingId === soundId) {
+      stopPreview()
+      previewingId = null
+      return
+    }
     error = null
     previewingId = soundId
     try {
-      await previewSound(soundId, 0.9)
+      await previewSound(soundId, 0.9, () => {
+        if (previewingId === soundId) previewingId = null
+      })
     } catch (err) {
       error = err?.message ?? String(err)
-    } finally {
-      setTimeout(() => {
-        if (previewingId === soundId) previewingId = null
-      }, 1200)
+      previewingId = null
     }
   }
 
@@ -95,8 +99,13 @@
       <div class="tiny muted" style="margin-top:4px">{group.label} · {group.items.length}개</div>
       {#each group.items as sound (sound.id)}
         <div class="list-item {value === sound.id ? 'active' : ''}">
-          <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
-            {previewingId === sound.id ? '♪' : '▶'}
+          <button
+            class="btn-icon sm plain"
+            class:accent-text={previewingId === sound.id}
+            aria-label={previewingId === sound.id ? '재생 중지' : '미리 듣기'}
+            onclick={() => togglePreview(sound.id)}
+          >
+            {previewingId === sound.id ? '■' : '▶'}
           </button>
           <button class="grow" style="background:transparent;border:0;text-align:left" onclick={() => choose(sound.id)}>
             <div class="card-title">{sound.name}</div>
@@ -117,8 +126,13 @@
     {/if}
     {#each store.sounds as sound (sound.id)}
       <div class="list-item {value === sound.id ? 'active' : ''}">
-        <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
-          {previewingId === sound.id ? '♪' : '▶'}
+        <button
+          class="btn-icon sm plain"
+          class:accent-text={previewingId === sound.id}
+          aria-label={previewingId === sound.id ? '재생 중지' : '미리 듣기'}
+          onclick={() => togglePreview(sound.id)}
+        >
+          {previewingId === sound.id ? '■' : '▶'}
         </button>
         <button class="grow" style="background:transparent;border:0;text-align:left" onclick={() => choose(sound.id)}>
           <div class="card-title truncate">{sound.name}</div>

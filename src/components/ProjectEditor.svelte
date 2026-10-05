@@ -4,7 +4,7 @@
   import SoundPicker from './SoundPicker.svelte'
   import { store } from '../lib/store.svelte.js'
   import { timer } from '../lib/engine.svelte.js'
-  import { previewSound } from '../lib/audio-session.js'
+  import { previewSound, stopPreview } from '../lib/audio-session.js'
   import { DEFAULT_SOUND_ID } from '../lib/bundled-sounds.js'
   import { clamp, formatDuration, formatKoreanDuration, uid } from '../lib/time.js'
 
@@ -34,7 +34,7 @@
   let pickerCueId = $state(null)
   let pickingDefault = $state(false)
   let confirmingDelete = $state(false)
-  let previewing = $state(false)
+  let previewingCueId = $state(null)
   let previewError = $state(null)
 
   function timeFieldOf(cue) {
@@ -155,15 +155,21 @@
     return cue.soundId ? store.soundName(cue.soundId) : `기본 소리 (${defaultSoundName})`
   }
 
-  async function previewCue(cue) {
+  async function togglePreviewCue(cue) {
+    if (previewingCueId === cue.id) {
+      stopPreview()
+      previewingCueId = null
+      return
+    }
     previewError = null
-    previewing = true
+    previewingCueId = cue.id
     try {
-      await previewSound(cue.soundId ?? draft.defaultSoundId, 0.9)
+      await previewSound(cue.soundId ?? draft.defaultSoundId, 0.9, () => {
+        if (previewingCueId === cue.id) previewingCueId = null
+      })
     } catch (error) {
       previewError = error?.message ?? String(error)
-    } finally {
-      setTimeout(() => (previewing = false), 1200)
+      previewingCueId = null
     }
   }
 
@@ -285,8 +291,13 @@
         />
         <span class="muted small">초</span>
         <span class="grow"></span>
-        <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => previewCue(cue)}>
-          {previewing ? '♪' : '▶'}
+        <button
+          class="btn-icon sm plain"
+          class:accent-text={previewingCueId === cue.id}
+          aria-label={previewingCueId === cue.id ? '재생 중지' : '미리 듣기'}
+          onclick={() => togglePreviewCue(cue)}
+        >
+          {previewingCueId === cue.id ? '■' : '▶'}
         </button>
       </div>
 

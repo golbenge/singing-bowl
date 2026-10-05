@@ -2,7 +2,7 @@
   /** 소리: 앱 샘플 소리 + 사용자가 추가한 음향 파일 */
   import { store } from '../lib/store.svelte.js'
   import { BUNDLED_SOUNDS, SOUND_SOURCES } from '../lib/bundled-sounds.js'
-  import { previewSound } from '../lib/audio-session.js'
+  import { previewSound, stopPreview } from '../lib/audio-session.js'
   import { formatBytes, formatDuration } from '../lib/time.js'
 
   let fileInput = $state(null)
@@ -43,17 +43,21 @@
     if (!added.length && !error) error = '추가된 파일이 없습니다.'
   }
 
-  async function preview(soundId) {
+  async function togglePreview(soundId) {
+    if (previewingId === soundId) {
+      stopPreview()
+      previewingId = null
+      return
+    }
     error = null
     previewingId = soundId
     try {
-      await previewSound(soundId, 0.9)
+      await previewSound(soundId, 0.9, () => {
+        if (previewingId === soundId) previewingId = null
+      })
     } catch (err) {
       error = err?.message ?? String(err)
-    } finally {
-      setTimeout(() => {
-        if (previewingId === soundId) previewingId = null
-      }, 1200)
+      previewingId = null
     }
   }
 
@@ -101,8 +105,13 @@
   <div class="list">
     {#each group.items as sound (sound.id)}
       <div class="list-item">
-        <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
-          {previewingId === sound.id ? '♪' : '▶'}
+        <button
+          class="btn-icon sm plain"
+          class:accent-text={previewingId === sound.id}
+          aria-label={previewingId === sound.id ? '재생 중지' : '미리 듣기'}
+          onclick={() => togglePreview(sound.id)}
+        >
+          {previewingId === sound.id ? '■' : '▶'}
         </button>
         <div class="grow">
           <div class="card-title">{sound.name}</div>
@@ -140,8 +149,13 @@
 <div class="list">
   {#each store.sounds as sound (sound.id)}
     <div class="list-item">
-      <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
-        {previewingId === sound.id ? '♪' : '▶'}
+      <button
+        class="btn-icon sm plain"
+        class:accent-text={previewingId === sound.id}
+        aria-label={previewingId === sound.id ? '재생 중지' : '미리 듣기'}
+        onclick={() => togglePreview(sound.id)}
+      >
+        {previewingId === sound.id ? '■' : '▶'}
       </button>
       <div class="grow">
         {#if renamingId === sound.id}
