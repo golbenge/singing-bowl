@@ -1,7 +1,7 @@
 <script>
   /** 소리: 앱 샘플 소리 + 사용자가 추가한 음향 파일 */
   import { store } from '../lib/store.svelte.js'
-  import { BUNDLED_SOUNDS } from '../lib/bundled-sounds.js'
+  import { BUNDLED_SOUNDS, SOUND_SOURCES } from '../lib/bundled-sounds.js'
   import { previewSound } from '../lib/audio-session.js'
   import { formatBytes, formatDuration } from '../lib/time.js'
 
@@ -12,6 +12,23 @@
   let renamingId = $state(null)
   let renameValue = $state('')
   let confirmingId = $state(null)
+  let bundledQuery = $state('')
+
+  /** 출처별로 묶은 샘플 목록 (검색어 적용) */
+  const bundledGroups = $derived.by(() => {
+    const q = bundledQuery.trim().toLowerCase()
+    const matched = q
+      ? BUNDLED_SOUNDS.filter((sound) =>
+          `${sound.name} ${sound.description} ${sound.author ?? ''}`
+            .toLowerCase()
+            .includes(q),
+        )
+      : BUNDLED_SOUNDS
+    return SOUND_SOURCES.map((source) => ({
+      ...source,
+      items: matched.filter((sound) => sound.source === source.key),
+    })).filter((group) => group.items.length)
+  })
 
   async function addFiles(event) {
     const input = event.currentTarget
@@ -71,22 +88,35 @@
   </span>
 </div>
 
-<div class="section-title">앱에 포함된 샘플 소리 (오프라인에서도 재생)</div>
-<div class="list">
-  {#each BUNDLED_SOUNDS as sound (sound.id)}
-    <div class="list-item">
-      <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
-        {previewingId === sound.id ? '♪' : '▶'}
-      </button>
-      <div class="grow">
-        <div class="card-title">{sound.name}</div>
-        <div class="card-sub">{sound.description}</div>
-        {#if sound.license}<div class="tiny muted">{sound.license}</div>{/if}
+<div class="section-title">앱에 포함된 샘플 소리 {BUNDLED_SOUNDS.length}개 (오프라인에서도 재생)</div>
+<input
+  class="input"
+  type="search"
+  placeholder="샘플 검색 (예: 볼2 · 모노 · 싱잉볼 · Kasper)"
+  bind:value={bundledQuery}
+  enterkeyhint="search"
+/>
+{#each bundledGroups as group (group.key)}
+  <div class="section-title">{group.label} · {group.items.length}개</div>
+  <div class="list">
+    {#each group.items as sound (sound.id)}
+      <div class="list-item">
+        <button class="btn-icon sm plain" aria-label="미리 듣기" onclick={() => preview(sound.id)}>
+          {previewingId === sound.id ? '♪' : '▶'}
+        </button>
+        <div class="grow">
+          <div class="card-title">{sound.name}</div>
+          <div class="card-sub">{sound.description}</div>
+          {#if sound.license}<div class="tiny muted">{sound.license}</div>{/if}
+        </div>
+        <span class="badge tabular">{formatDuration(sound.durationMs)}</span>
       </div>
-      <span class="badge tabular">{formatDuration(sound.durationMs)}</span>
-    </div>
-  {/each}
-</div>
+    {/each}
+  </div>
+{/each}
+{#if !bundledGroups.length}
+  <div class="empty">검색과 일치하는 샘플이 없습니다.</div>
+{/if}
 
 <div class="row-between" style="margin-top:6px">
   <div class="section-title">내 소리 {store.sounds.length}개</div>

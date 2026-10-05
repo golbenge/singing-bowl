@@ -13,7 +13,7 @@ Svelte 5 + Vite 로 만들었고, GitHub Pages 에 배포해 iPhone 홈 화면�
 | 타이머 | 타이머 묶음. 이름을 지정하고 여러 개 만들 수 있습니다. |
 | 시간대(cue) | 시작 후 N분 M초에 소리를 재생. 시간대는 몇 개든 추가할 수 있습니다. |
 | 소리 지정 | 타이머에 **기본 소리**를 지정하고, 특정 시간대에만 **다른 소리**를 지정할 수 있습니다. |
-| 소리 종류 | ① 앱에 포함된 **샘플 싱잉볼 녹음**(CC0, 약 30초) ② 사용자가 추가한 음향 파일(mp3/m4a/wav…) |
+| 소리 종류 | ① 앱에 포함된 **샘플 싱잉볼 녹음 36개**(BigSoundBank CC0 4개 + Kasper 무료 팩 32개) ② 사용자가 추가한 음향 파일(mp3/m4a/wav…) |
 | 실행 제어 | ▶ 시작 · ⏸ 일시 중지 · ▶ 이어서 · ■ 종료. 일시 중지 동안에는 시간과 소리 예약이 모두 멈춥니다. |
 | 진행 표시 | 경과 시간, 전체 길이, 다음 소리까지 남은 시간, 예상 재생 시각, 시간대별 재생/건너뜀 상태 |
 | 부가 기능 | 볼륨 조절, 미리 듣기, 타이머 복제, 소리 이름 변경, 잠금 화면 컨트롤(Media Session), 화면 꺼짐 방지(Wake Lock) |
@@ -73,7 +73,7 @@ headless 로 띄워서
 예전 버전 타이머 자동 이전 → 새로고침 후 데이터 유지 → 중단 복구 →
 **오프라인 실행(프리캐시)·샘플 음원 캐시·업데이트 안내·새로고침 동작**
 
-까지 75가지를 검사합니다.
+까지 81가지를 검사합니다.
 
 ```bash
 npm run build
@@ -117,26 +117,33 @@ BASE_PATH=/my-repo/ npm run build
 > 저장소를 public 으로 두어도 **사용자의 음향 파일과 타이머 데이터는 저장소에 올라가지 않습니다.**
 > 그것들은 각 기기의 IndexedDB 에만 저장되고, 저장소에는 소스 코드만 있습니다.
 
-## 샘플 소리(싱잉볼) 출처와 교체 방법
+## 샘플 소리 출처와 교체 방법
 
-앱에는 실제 싱잉볼 타격 녹음 1개가 함께 들어 있습니다(합성음이 아니라 실제 녹음입니다).
+앱에는 실제 싱잉볼 녹음 샘플 **36개**가 함께 들어 있습니다(합성음이 아니라 실제 녹음입니다).
+소리 보관함·소리 선택 화면에서 출처별 그룹과 검색으로 찾을 수 있습니다.
 
-| 항목 | 내용 |
-| --- | --- |
-| 이름 | Tibetan Bowl Struck #1 (싱잉볼 타격음, 약 30초) |
-| 파일 | `public/sounds/singing-bowl.m4a` (모노 48kHz AAC, 약 433KB) |
-| 출처 | [BigSoundBank](https://bigsoundbank.com/tibetan-bowl-struck-1-s1110.html) |
-| 저작자 | Joseph SARDIN |
-| 라이선스 | **CC0 1.0 (퍼블릭 도메인)** — 출처 표기 불필요, 수정·재배포 허용 |
+| 출처 | 수 | 라이선스 | 비고 |
+| --- | --- | --- | --- |
+| [BigSoundBank · Tibetan Bowl Struck](https://bigsoundbank.com/tibetan-bowl-struck-1-s1110.html) (Joseph SARDIN) | 4 | **CC0 1.0 (퍼블릭 도메인)** — 출처 표기 불필요, 수정·재배포 허용 | struck #1~#4 (ID 1110/2553/2554/2555), 모노 48kHz AAC |
+| [Kasper · Singing Bowls](https://kasper.bandcamp.com/album/singing-bowls) (Kasper, [Reddit에서 발견](https://www.reddit.com/r/futurebeatproducers/comments/8u0tab/free_tibetan_singing_bowls_sample_pack/)) | 32 | **무료 사용 허용** — 아티스트가 “Feel free to use these samples in your productions” 라고 명시 (Bandcamp에 무료 다운로드로 공개) | 볼 4종 × 해머 4종 × 마이크 2종 = 32개. 마이크 1 = Shure SM57 모노, 마이크 2 = Zoom H2n 스테레오 |
 
-파일은 서비스 워커가 앱과 함께 미리 받아 두므로 **네트워크 없이도 재생**됩니다.
+- 파일: `public/sounds/*.m4a` — AAC 48kHz, 모노 64kbps / 스테레오 96kbps (원본 mp3 ~29MB → 약 8.6MB)
+- 모든 샘플은 서비스 워커가 앱과 함께 미리 받아 두므로 **네트워크 없이도 재생**됩니다.
+- 메타데이터(이름·작가·녹음 방식·파일 번호·출처·라이선스·길이)는 `src/lib/bundled-sounds.js` 에 정의되어
+  있고, 소리 보관함·앱 정보(크레딧)에 표시됩니다.
 
-### 다른 소리로 바꾸고 싶을 때
+### 샘플을 추가/교체하고 싶을 때
 
-1. `public/sounds/singing-bowl.m4a` 를 원하는 음원 파일로 교체합니다(파일 이름 유지).
+1. `public/sounds/` 에 음원 파일(m4a 권장)을 넣습니다.
    - iPhone은 **m4a(AAC)·mp3·wav** 를 재생합니다. (ogg/flac은 지원하지 않으니 변환이 필요합니다.)
    - 파일이 크면 앱 용량과 오프라인 캐시 크기가 커지니 10~30초 길이를 권장합니다.
-2. `src/lib/bundled-sounds.js` 의 `durationMs`(목록에 표시되는 길이)만 실제 길이에 맞게 수정합니다.
+   ```bash
+   # mp3 -> m4a 로 용량 줄이기 (모노 64kbps 예시)
+   ffmpeg -i input.mp3 -c:a aac -b:a 64k -ac 1 -ar 48000 output.m4a
+   ```
+2. `src/lib/bundled-sounds.js` 의 `BUNDLED_SOUNDS` 배열에 항목을 추가합니다.
+   (`id`·`name`·`file`·`durationMs`·`license` 필수. `SOUND_SOURCES` 에 새 출처를 넣으면 목록 헤더와
+   크레딧에 그룹으로 표시됩니다.)
 3. `npm run build` 로 다시 빌드하면 끝입니다.
 
 개인 음원을 쓰고 싶다면 코드를 고치지 않고 앱에서 **소리 → ＋ 음향 파일 추가**로 넣은 뒤
@@ -281,7 +288,10 @@ src/
     └── time.js                 # 시간 포맷 유틸
 
 public/
-└── sounds/singing-bowl.m4a     # 샘플 싱잉볼 녹음 (CC0, 오프라인 캐시 대상)
+└── sounds/                       # 샘플 싱잉볼 녹음 36개 (오프라인 캐시 대상)
+    ├── singing-bowl.m4a          # 싱잉볼 (BigSoundBank #1, CC0)
+    ├── bsb-struck-{2,3,4}.m4a    # BigSoundBank struck #2~#4 (CC0)
+    └── kasper-b{1-4}-a{1-4}-m{1,2}.m4a  # Kasper 팩 32개 (m1 모노 / m2 스테레오)
 ```
 
 
@@ -292,7 +302,7 @@ public/
 - 시간대는 **시작 후 경과 시간** 기준입니다(타이머이므로 일시 중지가 가능합니다).
 - 소리는 시작할 때 모두 디코딩합니다. 아주 긴 음원(수십 분)을 여러 시간대에 쓰면 메모리를 많이 씁니다.
   알림용 짧은 종소리·효과음 용도에 적합합니다(기본 샘플은 약 30초).
-- 서비스 워커가 앱 파일과 샘플 음원을 함께 캐시하므로 오프라인 캐시 용량은 약 0.7MB입니다.
+- 서비스 워커가 앱 파일과 샘플 음원 36개를 함께 캐시하므로 오프라인 캐시 용량은 약 9MB입니다.
 - iOS는 백그라운드 알림을 보장하지 않으므로 “알림”이 아니라 “소리 재생”으로 알려 줍니다.
 - 앱이 완전히 종료되면 예약 재생도 끝납니다. 이 경우 앱을 다시 열어 ‘이어서 재생’을 사용하세요.
 

@@ -7,7 +7,7 @@
   import { store } from '../lib/store.svelte.js'
   import { timer } from '../lib/engine.svelte.js'
   import { appUpdate, applyUpdate, checkForUpdate } from '../lib/app-update.svelte.js'
-  import { BUNDLED_SOUNDS } from '../lib/bundled-sounds.js'
+  import { BUNDLED_SOUNDS, SOUND_SOURCES } from '../lib/bundled-sounds.js'
   import { formatBytes, formatDateTime, formatIsoDateTime } from '../lib/time.js'
 
   let { onback } = $props()
@@ -139,17 +139,18 @@
 
 <div class="section-title">크레딧</div>
 <article class="card stack">
-  {#each BUNDLED_SOUNDS as sound (sound.id)}
+  <div class="small">함께 들어 있는 샘플 소리 {BUNDLED_SOUNDS.length}개:</div>
+  {#each SOUND_SOURCES as source (source.key)}
     <div class="small">
-      함께 들어 있는 샘플 소리 “{sound.name}” — {sound.license}
+      {source.label} · {BUNDLED_SOUNDS.filter((sound) => sound.source === source.key).length}개 —
+      {source.license} —
+      <a href={source.url} target="_blank" rel="noreferrer">출처 보기</a>
     </div>
   {/each}
   <div class="tiny muted">
-    샘플 음원 출처: <a
-      href="https://bigsoundbank.com/tibetan-bowl-struck-1-s1110.html"
-      target="_blank"
-      rel="noreferrer">BigSoundBank · Tibetan Bowl Struck #1 (Joseph SARDIN, CC0)</a>.
-    CC0(퍼블릭 도메인)라 출처 표기 없이도 사용할 수 있지만, 감사한 마음으로 표기합니다.
+    BigSoundBank 샘플은 CC0(퍼블릭 도메인)라 출처 표기 없이도 사용할 수 있지만, 감사한 마음으로
+    표기합니다. Kasper 샘플은 "제작물에 자유롭게 사용하라"는 아티스트의 명시적 허락에 따라
+    무료로 제공합니다(4개의 볼 × 4종의 해머 × 2개의 마이크 녹음).
   </div>
   <div class="divider"></div>
   <div class="tiny muted">

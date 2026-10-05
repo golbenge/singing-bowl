@@ -459,6 +459,13 @@ const libraryText = await text()
 check('앱에 포함된 샘플 소리(싱잉볼)가 표시된다', libraryText.includes('싱잉볼'))
 check('샘플 소리 길이(0:30)가 표시된다', libraryText.includes('0:30'))
 check('샘플 소리 라이선스(CC0)가 표시된다', libraryText.includes('CC0'))
+check('앱에 포함된 샘플 소리가 36개 있다', libraryText.includes('샘플 소리 36개'), '')
+check(
+  '샘플이 출처별로 묶여 있다',
+  libraryText.includes('BigSoundBank · Tibetan Bowl Struck · 4개') &&
+    libraryText.includes('Kasper · Singing Bowls · 32개'),
+  '',
+)
 
 // 사용자 음향 파일 추가(IndexedDB 저장 + 디코딩 검증)
 const fileResult = await uploadFile(`window.__makeWavFile('tone-test.wav', 'audio/wav')`)
